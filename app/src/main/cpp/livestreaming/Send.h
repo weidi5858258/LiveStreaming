@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 #include <list>
+
 extern "C" {
 #include "librtmp/rtmp.h"
 };
@@ -21,15 +22,17 @@ private:
 
     std::list<RTMPPacket *> h264_list;
     std::list<RTMPPacket *> aac_list;
-    bool isDoing;
-    RTMP* _rtmp;
+    bool _isDoing;
+    RTMP *_rtmp;
 public:
     Send();
 
     ~Send();
 
-    void gameOver() {
-        isDoing = false;
+    void gameOver();
+
+    bool isSending() {
+        return _isDoing;
     }
 
     void setRTMP(RTMP *rtmp) {
@@ -42,9 +45,9 @@ public:
 
     static void *sendH264(void *arg);
 
-    void sendAac();
+    static void *sendAac(void *arg);
 
-    void start();
+    void startSend();
 };
 
 

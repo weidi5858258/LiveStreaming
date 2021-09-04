@@ -120,7 +120,7 @@ private:
 
     //void (*_callback)(MARK mark, AMediaCodecBufferInfo &info, uint8_t *data);
 
-    static void *startEncoder(void *arg);
+    static void *startScreenRecordEncoder(void *arg);
 
     void screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data);
 

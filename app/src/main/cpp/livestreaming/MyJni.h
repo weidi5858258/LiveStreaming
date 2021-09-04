@@ -20,23 +20,13 @@ enum DO_SOMETHING_CODE {
     // java ---> jni
     DO_SOMETHING_CODE_init = 1000,
     DO_SOMETHING_CODE_init_rtmp = 1001,
-    DO_SOMETHING_CODE_Client_connect = 1002,
-    DO_SOMETHING_CODE_Client_disconnect = 1003,
-    DO_SOMETHING_CODE_Client_send_data = 1004,
-    DO_SOMETHING_CODE_Client_set_info = 1005,
-    DO_SOMETHING_CODE_Server_set_ip = 1006,
-    DO_SOMETHING_CODE_Server_close = 1007,
-    DO_SOMETHING_CODE_get_server_port = 1008,
-    DO_SOMETHING_CODE_close_all_clients = 1009,
-    DO_SOMETHING_CODE_close_one_client = 1010,
-    DO_SOMETHING_CODE_set_surface = 1011,
     DO_SOMETHING_CODE_start_screen_record_prepare = 1012,
     DO_SOMETHING_CODE_start_screen_record = 1013,
     DO_SOMETHING_CODE_stop_screen_record = 1014,
     DO_SOMETHING_CODE_start_audio_record_prepare = 1015,
     DO_SOMETHING_CODE_start_audio_record = 1016,
     DO_SOMETHING_CODE_stop_audio_record = 1017,
-    DO_SOMETHING_CODE_is_recording = 1014,
+    DO_SOMETHING_CODE_is_recording = 1018,
     DO_SOMETHING_CODE_fromPortraitToLandscape = 1016,
     DO_SOMETHING_CODE_fromLandscapeToPortrait = 1017,
     DO_SOMETHING_CODE_release_sps_pps = 1018,
@@ -61,22 +51,12 @@ enum {
     MSG_ON_TRANSACT_INIT_VIDEO_MEDIACODEC = 0x1005,
 };
 
-void connect(int which_client);
-
-void disconnect(int which_client);
-
-void changeWindow(int which_client, int orientation);
-
-void setData(int code, int which_client, const char *data, ssize_t size);
-
-void putDataToJava(int which_client, unsigned char *encodedData, ssize_t size);
-
 char *findDecoderCodecName(int code, int which_client, const char *data, ssize_t size);
 
 void createPortraitVirtualDisplay();
 
 void createLandscapeVirtualDisplay();
 
-void sendDataError();
+jint onTransact_release(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject);
 
 #endif //USEFRAGMENTS_FFMPEG_H

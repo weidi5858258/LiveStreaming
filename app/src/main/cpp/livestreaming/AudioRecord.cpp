@@ -10,10 +10,13 @@
 #include "include/Log.h"
 #include "MediaCodec.h"
 #include "AudioRecord.h"
+#include "MyJni.h"
 
 #define LOG "player_alexander"
 
 #define RECORDER_FRAMES 2048
+
+extern int release_count;
 
 static pthread_mutex_t audioEngineLock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -25,7 +28,7 @@ AudioRecord::AudioRecord() :
         recorderBufferQueue(NULL),
         index(0),
         recordBufferSize(RECORDER_FRAMES),
-        isRecording(false),
+        _isDoing(false),
         mediaCodec(NULL) {
     LOGI("AudioRecord::AudioRecord()");
     recordBuffers[0] = new short[recordBufferSize];
@@ -59,7 +62,7 @@ AudioRecord::~AudioRecord() {
         engineEngine = NULL;
     }
 
-    //pthread_mutex_destroy(&audioEngineLock);
+    pthread_mutex_destroy(&audioEngineLock);
 }
 
 void AudioRecord::createEngine() {
@@ -147,9 +150,7 @@ void AudioRecord::createAudioRecorder() {
 }
 
 void AudioRecord::startRecording() {
-    if (isRecording) {
-        return;
-    }
+    _isDoing = true;
     SLresult result;
 
     if (pthread_mutex_trylock(&audioEngineLock)) {
@@ -181,8 +182,6 @@ void AudioRecord::startRecording() {
     result = (*recorderRecord)->SetRecordState(recorderRecord, SL_RECORDSTATE_RECORDING);
     assert(SL_RESULT_SUCCESS == result);
     (void) result;
-
-    isRecording = true;
 }
 
 // this callback handler is called every time a buffer finishes recording
@@ -196,7 +195,7 @@ void AudioRecord::bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *con
     // for streaming recording, here we would call Enqueue to give recorder the next buffer to fill
     // but instead, this is a one-time buffer so we stop recording
     SLresult result;
-    if (audioRecord->isRecording) {
+    if (audioRecord->_isDoing) {
         int tempIndex = audioRecord->index;
         unsigned int tempRecordBufferSize = audioRecord->recordBufferSize;
 
@@ -222,6 +221,8 @@ void AudioRecord::bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *con
         if (SL_RESULT_SUCCESS == result) {
             //recorderSize = RECORDER_FRAMES * sizeof(short);
         }
+        release_count++;
+        onTransact_release(nullptr, nullptr, 0, nullptr);
     }
 
     pthread_mutex_unlock(&audioEngineLock);

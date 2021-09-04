@@ -21,7 +21,7 @@ private:
     int index;
     short *recordBuffers[2];
     unsigned int recordBufferSize;
-    bool isRecording;
+    bool _isDoing;
 
     MediaCodec *mediaCodec;
 public:
@@ -36,7 +36,7 @@ public:
     void startRecording();
 
     void gameOver() {
-        isRecording = false;
+        _isDoing = false;
     }
 
     void setMediaCodec(MediaCodec *codec) {

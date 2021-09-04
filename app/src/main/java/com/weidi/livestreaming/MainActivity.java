@@ -8,9 +8,11 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -107,26 +109,22 @@ public class MainActivity extends AppCompatActivity {
 
     ////////////////////////////////////////////////////////////////////////////////////
 
-    private TextView mStartLiveStreamingTV;
     private MediaProjectionManager mMediaProjectionManager;
     private MediaProjection mMediaProjection;
+    private Button mBtn1;
+    private Button mBtn2;
+    private boolean mIsLiving1 = false;
+    private boolean mIsLiving2 = false;
 
     private void internalOnCreate() {
         EventBusUtils.register(this);
 
         mMediaProjectionManager =
                 (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-        mStartLiveStreamingTV = findViewById(R.id.start_live_streaming_tv);
-
-        mStartLiveStreamingTV.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                //
-                EventBusUtils.removeMessages(CREATE_SCREEN_CAPTURE_INTENT);
-                EventBusUtils.postDelayed(MainActivity.class.getName(),
-                        CREATE_SCREEN_CAPTURE_INTENT, 500, null);
-            }
-        });
+        mBtn1 = findViewById(R.id.btn1);
+        mBtn2 = findViewById(R.id.btn2);
+        mBtn1.setOnClickListener(mOnClickListener);
+        mBtn2.setOnClickListener(mOnClickListener);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             // 申请浮窗权限
@@ -142,7 +140,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void internalOnResume() {
-
+        String ret = MyJni.getDefault().onTransact(MyJni.DO_SOMETHING_CODE_is_recording, null);
+        if (!TextUtils.isEmpty(ret)) {
+            mIsLiving2 = Boolean.parseBoolean(ret);
+        }
+        if (!mIsLiving1 && !mIsLiving2) {
+            mBtn1.setVisibility(View.VISIBLE);
+            mBtn2.setVisibility(View.VISIBLE);
+            mBtn1.setText("摄像头直播");
+            mBtn2.setText("录屏直播");
+        } else if (mIsLiving1 && !mIsLiving2) {
+            mBtn1.setVisibility(View.VISIBLE);
+            mBtn2.setVisibility(View.GONE);
+            mBtn1.setText("结束直播");
+        } else if (!mIsLiving1 && mIsLiving2) {
+            mBtn1.setVisibility(View.GONE);
+            mBtn2.setVisibility(View.VISIBLE);
+            mBtn2.setText("结束直播");
+        }
     }
 
     private void internalOnPause() {
@@ -228,6 +243,22 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void onClick(View v) {
+        switch (v.getId()) {
+            case R.id.btn1: {
+                break;
+            }
+            case R.id.btn2: {
+                EventBusUtils.removeMessages(CREATE_SCREEN_CAPTURE_INTENT);
+                EventBusUtils.postDelayed(MainActivity.class.getName(),
+                        CREATE_SCREEN_CAPTURE_INTENT, 500, null);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
     private Object onEvent(int what, Object[] objArray) {
         Object result = null;
         switch (what) {
@@ -243,6 +274,13 @@ public class MainActivity extends AppCompatActivity {
         }
         return result;
     }
+
+    private View.OnClickListener mOnClickListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            MainActivity.this.onClick(v);
+        }
+    };
 
     /*private TextureView.SurfaceTextureListener mSurfaceTextureListener =
             new TextureView.SurfaceTextureListener() {

@@ -59,6 +59,8 @@ static AudioRecord *audioRecord = nullptr;
 static Send *send = nullptr;
 static RTMP *rtmp = nullptr;
 
+int release_count = 0;
+
 /***
  called at the library loaded.
  这个方法只有放在这个文件里才有效,在其他文件不会被回调
@@ -161,7 +163,11 @@ static jint onTransact_stop(JNIEnv *env, jobject myJniObject, jint code, jobject
     return JNI_OK;
 }
 
-static jint onTransact_release(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject) {
+jint onTransact_release(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject) {
+    LOGI("onTransact_release() start");
+    if (release_count < 2) {
+        return JNI_ERR;
+    }
     if (rtmp) {
         if (RTMP_IsConnected(rtmp)) {
             RTMP_Close(rtmp);
@@ -185,6 +191,8 @@ static jint onTransact_release(JNIEnv *env, jobject myJniObject, jint code, jobj
         delete send;
         send = nullptr;
     }
+    release_count = 0;
+    LOGI("onTransact_release() end");
     return JNI_OK;
 }
 
@@ -380,28 +388,29 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
             return env->NewStringUTF("false");
         }
         case DO_SOMETHING_CODE_start_screen_record: {
-            //screenRecordMediaCodec->setCallBack(screenRecordCallback);
             screenRecordMediaCodec->startScreenRecord();
+            send->startSend();
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_stop_screen_record: {
-            screenRecordMediaCodec->gameOver();
+            onTransact_stop(env, thiz, code, jniObject);
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_start_audio_record_prepare: {
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_start_audio_record: {
-            //audioRecordMediaCodec->setCallBack(audioRecordCallback);
-            audioRecord->setMediaCodec(audioRecordMediaCodec);
             audioRecord->startRecording();
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_stop_audio_record: {
-            audioRecord->gameOver();
-
-
             return env->NewStringUTF(ret);
+        }
+        case DO_SOMETHING_CODE_is_recording: {
+            if (send) {
+                return env->NewStringUTF(send->isSending() ? "true" : "false");
+            }
+            return env->NewStringUTF("false");
         }
         default:
             break;

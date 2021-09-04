@@ -17,12 +17,6 @@ public class MyJni {
 
     private static final String TAG = "player_alexander";
 
-    // jni  ---> java
-    public static final JniObject serverFrame1 = JniObject.obtain();
-    public static final JniObject serverFrame2 = JniObject.obtain();
-    // java ---> jni
-    public static final JniObject clientFrame = JniObject.obtain();
-
     static {
         try {
             System.loadLibrary("livestreaming");
@@ -51,24 +45,13 @@ public class MyJni {
     // java ---> jni
     public static final int DO_SOMETHING_CODE_init = 1000;
     public static final int DO_SOMETHING_CODE_init_rtmp = 1001;
-    public static final int DO_SOMETHING_CODE_Client_connect = 1002;
-    public static final int DO_SOMETHING_CODE_Client_disconnect = 1003;
-    public static final int DO_SOMETHING_CODE_Client_send_data = 1004;
-    public static final int DO_SOMETHING_CODE_Client_set_info = 1005;
-    public static final int DO_SOMETHING_CODE_Server_set_ip = 1006;
-    public static final int DO_SOMETHING_CODE_Server_close = 1007;
-    public static final int DO_SOMETHING_CODE_get_server_port = 1008;
-    public static final int DO_SOMETHING_CODE_close_all_clients = 1009;
-    public static final int DO_SOMETHING_CODE_close_one_client = 1010;
-    public static final int DO_SOMETHING_CODE_set_surface = 1011;
     public static final int DO_SOMETHING_CODE_start_screen_record_prepare = 1012;
     public static final int DO_SOMETHING_CODE_start_screen_record = 1013;
-    public static final int DO_SOMETHING_CODE_is_recording = 1014;
-    public static final int DO_SOMETHING_CODE_stop_screen_record = 1015;
-    public static final int DO_SOMETHING_CODE_fromPortraitToLandscape = 1016;
-    public static final int DO_SOMETHING_CODE_fromLandscapeToPortrait = 1017;
-    public static final int DO_SOMETHING_CODE_release_sps_pps = 1018;
-    public static final int DO_SOMETHING_CODE_only_output_key_frame = 1019;
+    public static final int DO_SOMETHING_CODE_stop_screen_record = 1014;
+    public static final int DO_SOMETHING_CODE_start_audio_record_prepare = 1015;
+    public static final int DO_SOMETHING_CODE_start_audio_record = 1016;
+    public static final int DO_SOMETHING_CODE_stop_audio_record = 1017;
+    public static final int DO_SOMETHING_CODE_is_recording = 1018;
 
     // jni ---> java
     public static final int DO_SOMETHING_CODE_connected = 2000;

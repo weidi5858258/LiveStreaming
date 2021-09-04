@@ -18,10 +18,12 @@
 #include <time.h>
 
 #include "include/Log.h"
-#include "MyJni.h"
 #include "MediaCodec.h"
+#include "MyJni.h"
 
 #define LOG "player_alexander"
+
+extern int release_count;
 
 static int TIME_OUT = 10000;
 
@@ -154,26 +156,21 @@ void MediaCodec::startScreenRecord() {
 
     LOGI("MediaCodec::startScreenRecord() start\n");
     _isDoing = true;
-
     createPortraitVirtualDisplay();
     if (_sps_pps == nullptr) {
         getSpsPps();
     }
-
     // 开启线程不断地读取数据
     pthread_t p_tids_receive_data;
-    // 定义一个属性
-    pthread_attr_t attr;
+    pthread_attr_t attr;// 定义一个属性
     sched_param param;
     // 初始化属性值,均设为默认值
     pthread_attr_init(&attr);
     pthread_attr_getschedparam(&attr, &param);
     pthread_attr_setschedparam(&attr, &param);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
-    pthread_create(&p_tids_receive_data, &attr, startEncoder, this);
+    pthread_create(&p_tids_receive_data, &attr, startScreenRecordEncoder, this);
     LOGI("MediaCodec::startScreenRecord() end\n");
-
-    _send->start();
 }
 
 void MediaCodec::startAudioRecordEncoderMediaCodec(
@@ -204,11 +201,11 @@ void MediaCodec::startAudioRecordEncoderMediaCodec(
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-void *MediaCodec::startEncoder(void *arg) {
+void *MediaCodec::startScreenRecordEncoder(void *arg) {
     MediaCodec *mediaCodec = (MediaCodec *) arg;
     int64_t start_time = currentTimeMillis();
     int64_t end_time = 0;
-    LOGI("startEncoder() start\n");
+    LOGI("MediaCodec::startScreenRecordEncoder() start\n");
     while (mediaCodec->_isDoing) {
         /*end_time = currentTimeMillis();
         if (end_time - start_time >= 1000) {
@@ -217,7 +214,9 @@ void *MediaCodec::startEncoder(void *arg) {
         }*/
         mediaCodec->drainOutputBuffer(mediaCodec->_codec, true, false);
     }
-    LOGI("startEncoder() end\n");
+    LOGI("MediaCodec::startScreenRecordEncoder() end\n");
+    release_count++;
+    onTransact_release(nullptr, nullptr, 0, nullptr);
 }
 
 bool MediaCodec::feedInputBufferAndDrainOutputBuffer(AMediaCodec *codec,
@@ -677,7 +676,6 @@ void MediaCodec::screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data
     // data就是录制屏幕后编码成h264的数据
     // 然后进行封装
     // 最后进行发送
-    //LOGI("screenRecordCallback() presentationTimeUs: %lld", info.presentationTimeUs);
     RTMPPacket *packet = nullptr;
     int32_t size = info.size;
     int body_size = 9 + size;
