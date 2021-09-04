@@ -71,9 +71,29 @@ extern "C"
 
   uint32_t RTMP_GetTime(void);
 
-#define RTMP_PACKET_TYPE_AUDIO 0x08
-#define RTMP_PACKET_TYPE_VIDEO 0x09
-#define RTMP_PACKET_TYPE_INFO  0x12
+/*      RTMP_PACKET_TYPE_...                0x00 */
+#define RTMP_PACKET_TYPE_CHUNK_SIZE         0x01
+/*      RTMP_PACKET_TYPE_...                0x02 */
+#define RTMP_PACKET_TYPE_BYTES_READ_REPORT  0x03
+#define RTMP_PACKET_TYPE_CONTROL            0x04
+#define RTMP_PACKET_TYPE_SERVER_BW          0x05
+#define RTMP_PACKET_TYPE_CLIENT_BW          0x06
+/*      RTMP_PACKET_TYPE_...                0x07 */
+#define RTMP_PACKET_TYPE_AUDIO              0x08
+#define RTMP_PACKET_TYPE_VIDEO              0x09
+/*      RTMP_PACKET_TYPE_...                0x0A */
+/*      RTMP_PACKET_TYPE_...                0x0B */
+/*      RTMP_PACKET_TYPE_...                0x0C */
+/*      RTMP_PACKET_TYPE_...                0x0D */
+/*      RTMP_PACKET_TYPE_...                0x0E */
+#define RTMP_PACKET_TYPE_FLEX_STREAM_SEND   0x0F
+#define RTMP_PACKET_TYPE_FLEX_SHARED_OBJECT 0x10
+#define RTMP_PACKET_TYPE_FLEX_MESSAGE       0x11
+#define RTMP_PACKET_TYPE_INFO               0x12
+#define RTMP_PACKET_TYPE_SHARED_OBJECT      0x13
+#define RTMP_PACKET_TYPE_INVOKE             0x14
+/*      RTMP_PACKET_TYPE_...                0x15 */
+#define RTMP_PACKET_TYPE_FLASH_VIDEO        0x16
 
 #define RTMP_MAX_HEADER_SIZE 18
 
@@ -92,15 +112,54 @@ extern "C"
 
   typedef struct RTMPPacket
   {
+   /**
+    * #define RTMP_PACKET_SIZE_LARGE    0
+    * #define RTMP_PACKET_SIZE_MEDIUM   1
+    * #define RTMP_PACKET_SIZE_SMALL    2
+    * #define RTMP_PACKET_SIZE_MINIMUM  3
+    */
     uint8_t m_headerType;
+    /**
+     * 音频、视频包类型
+     *
+     * #define RTMP_PACKET_TYPE_AUDIO    0x08
+     * #define RTMP_PACKET_TYPE_VIDEO    0x09
+     * #define RTMP_PACKET_TYPE_INFO     0x12
+     */
     uint8_t m_packetType;
+    /**
+     * 是否使用绝对时间戳，一般定义为0。
+     */
     uint8_t m_hasAbsTimestamp;	/* timestamp absolute or relative? */
+    /**
+     * #define STREAM_CHANNEL_METADATA  0x03
+     * #define STREAM_CHANNEL_VIDEO     0x04
+     * #define STREAM_CHANNEL_AUDIO     0x05
+     */
     int m_nChannel;
+    /**
+     * 时间戳
+     *
+     * 一般视频时间戳可以从0开始计算，每帧时间戳 + 1000/fps (25fps每帧递增25；30fps递增33)
+     * 音频时间戳也可以从0开始计算，48K采样每帧递增21；44.1K采样每帧递增23。
+     */
     uint32_t m_nTimeStamp;	/* timestamp */
     int32_t m_nInfoField2;	/* last 4 bytes in a long header */
+    /**
+     * 数据包长度 = NALU包长度 + 包头长度
+     */
     uint32_t m_nBodySize;
+    /**
+     * 不用管
+     */
     uint32_t m_nBytesRead;
+    /**
+     * 不用管
+     */
     RTMPChunk *m_chunk;
+    /**
+     * 包头数据 + NALU数据，其长度为packet->m_nBodySize
+     */
     char *m_body;
   } RTMPPacket;
 
@@ -116,7 +175,7 @@ extern "C"
 
   void RTMPPacket_Reset(RTMPPacket *p);
   void RTMPPacket_Dump(RTMPPacket *p);
-  int RTMPPacket_Alloc(RTMPPacket *p, int nSize);
+  int RTMPPacket_Alloc(RTMPPacket *p, uint32_t nSize);
   void RTMPPacket_Free(RTMPPacket *p);
 
 #define RTMPPacket_IsReady(a)	((a)->m_nBytesRead == (a)->m_nBodySize)
@@ -135,7 +194,10 @@ extern "C"
     AVal auth;
     AVal flashVer;
     AVal subscribepath;
+    AVal usherToken;
     AVal token;
+    AVal pubUser;
+    AVal pubPasswd;
     AMFObject extras;
     int edepth;
 
@@ -148,12 +210,15 @@ extern "C"
 #define RTMP_LF_PLST	0x0008	/* send playlist before play */
 #define RTMP_LF_BUFX	0x0010	/* toggle stream on BufferEmpty msg */
 #define RTMP_LF_FTCU	0x0020	/* free tcUrl on close */
+#define RTMP_LF_FAPU	0x0040	/* free app on close */
     int lFlags;
 
     int swfAge;
 
     int protocol;
     int timeout;		/* connection timeout in seconds */
+
+    int pFlags;			/* unused, but kept to avoid breaking ABI */
 
     unsigned short socksport;
     unsigned short port;
@@ -232,9 +297,11 @@ extern "C"
     int m_numCalls;
     RTMP_METHOD *m_methodCalls;	/* remote method calls queue */
 
-    RTMPPacket *m_vecChannelsIn[RTMP_CHANNELS];
-    RTMPPacket *m_vecChannelsOut[RTMP_CHANNELS];
-    int m_channelTimestamp[RTMP_CHANNELS];	/* abs timestamp of last packet */
+    int m_channelsAllocatedIn;
+    int m_channelsAllocatedOut;
+    RTMPPacket **m_vecChannelsIn;
+    RTMPPacket **m_vecChannelsOut;
+    int *m_channelTimestamp;	/* abs timestamp of last packet */
 
     double m_fAudioCodecs;	/* audioCodecs for the connect packet */
     double m_fVideoCodecs;	/* videoCodecs for the connect packet */
@@ -277,6 +344,7 @@ extern "C"
 			uint32_t swfSize,
 			AVal *flashVer,
 			AVal *subscribepath,
+			AVal *usherToken,
 			int dStart,
 			int dStop, int bLiveStream, long int timeout);
 
@@ -285,6 +353,7 @@ extern "C"
   int RTMP_Connect0(RTMP *r, struct sockaddr *svc);
   int RTMP_Connect1(RTMP *r, RTMPPacket *cp);
   int RTMP_Serve(RTMP *r);
+  int RTMP_TLS_Accept(RTMP *r, void *ctx);
 
   int RTMP_ReadPacket(RTMP *r, RTMPPacket *packet);
   int RTMP_SendPacket(RTMP *r, RTMPPacket *packet, int queue);
@@ -306,6 +375,9 @@ extern "C"
   RTMP *RTMP_Alloc(void);
   void RTMP_Free(RTMP *r);
   void RTMP_EnableWrite(RTMP *r);
+
+  void *RTMP_TLS_AllocServerContext(const char* cert, const char* key);
+  void RTMP_TLS_FreeServerContext(void *ctx);
 
   int RTMP_LibVersion(void);
   void RTMP_UserInterrupt(void);	/* user typed Ctrl-C */

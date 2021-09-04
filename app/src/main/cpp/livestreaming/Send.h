@@ -8,7 +8,7 @@
 #include <pthread.h>
 #include <list>
 extern "C" {
-#include "include/rtmp/rtmp.h"
+#include "librtmp/rtmp.h"
 };
 
 class Send {

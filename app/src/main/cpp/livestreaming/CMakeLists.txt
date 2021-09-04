@@ -10,7 +10,8 @@ cmake_minimum_required(VERSION 3.4.1)
 #set(CMAKE_BUILD_TYPE Release)
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -UNDEBUG")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -Wall")
+#编译rtmpdump不用OpenSSL :CRYPTO
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -Wall -DNO_CRYPTO")
 
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
@@ -30,11 +31,11 @@ add_library(livestreaming
 
         SHARED
 
-#        rtmp/amf.c
-#        rtmp/hashswf.c
-#        rtmp/log.c
-#        rtmp/parseurl.c
-#        rtmp/rtmp.c
+        librtmp/amf.c
+        librtmp/hashswf.c
+        librtmp/log.c
+        librtmp/parseurl.c
+        librtmp/rtmp.c
 
         MyJni.cpp
         MediaCodec.cpp
@@ -172,19 +173,18 @@ endif (${ANDROID_ABI} STREQUAL "x86")
 #        ${LIBS_DIR}/${CPU_DIR}/libijkffmpeg.so)
 
 # 添加库
-add_library(
-        # 库名称
-        librtmp
-        # 动态库
-        SHARED
-        # 表示该库是引用的不是生成的
-        IMPORTED)
+#add_library(
+#        # 库名称
+#        librtmp
+#        # 动态库
+#        SHARED
+#        # 表示该库是引用的不是生成的
+#        IMPORTED)
 # 引用库
-set_target_properties(
-        # 库名称
-        librtmp
-        # 库的路径
-        PROPERTIES IMPORTED_LOCATION
-        ${LIBS_DIR}/${CPU_DIR}/librtmp.so)
-        #${CMAKE_CURRENT_SOURCE_DIR}/../../nativeLibs/${ANDROID_ABI}/librtmp.so)
+#set_target_properties(
+#        # 库名称
+#        librtmp
+#        # 库的路径
+#        PROPERTIES IMPORTED_LOCATION
+#        ${LIBS_DIR}/${CPU_DIR}/librtmp.so)
 #################################################################

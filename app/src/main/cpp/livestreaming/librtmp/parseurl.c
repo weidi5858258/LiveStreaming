@@ -27,8 +27,8 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include "../include/rtmp/rtmp_sys.h"
-#include "../include/rtmp/rtmp_log.h"
+#include "rtmp_sys.h"
+#include "log.h"
 
 int RTMP_ParseURL(const char *url, int *protocol, AVal *host, unsigned int *port,
 	AVal *playpath, AVal *app)
@@ -137,12 +137,14 @@ parsehost:
 	 * application = app[/appinstance]
 	 */
 
-	char *slash2, *slash3 = NULL;
+	char *slash2, *slash3 = NULL, *slash4 = NULL;
 	int applen, appnamelen;
 
 	slash2 = strchr(p, '/');
 	if(slash2)
 		slash3 = strchr(slash2+1, '/');
+	if(slash3)
+		slash4 = strchr(slash3+1, '/');
 
 	applen = end-p; /* ondemand, pass all parameters as app */
 	appnamelen = applen; /* ondemand length */
@@ -156,7 +158,9 @@ parsehost:
                 appnamelen = 8;
         }
 	else { /* app!=ondemand, so app is app[/appinstance] */
-		if(slash3)
+		if(slash4)
+			appnamelen = slash4-p;
+		else if(slash3)
 			appnamelen = slash3-p;
 		else if(slash2)
 			appnamelen = slash2-p;

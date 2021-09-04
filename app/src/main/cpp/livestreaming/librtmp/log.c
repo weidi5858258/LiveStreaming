@@ -27,8 +27,8 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include "../include/rtmp/rtmp_sys.h"
-#include "../include/rtmp/rtmp_log.h"
+#include "rtmp_sys.h"
+#include "log.h"
 
 #define MAX_PRINT_LEN	2048
 
@@ -92,6 +92,10 @@ RTMP_LogLevel RTMP_LogGetLevel()
 void RTMP_Log(int level, const char *format, ...)
 {
 	va_list args;
+
+	if ( level > RTMP_debuglevel )
+		return;
+
 	va_start(args, format);
 	cb(level, format, args);
 	va_end(args);
