@@ -40,9 +40,11 @@ public:
 
     void putAac(RTMPPacket *packet);
 
-    void sendH264();
+    static void *sendH264(void *arg);
 
     void sendAac();
+
+    void start();
 };
 
 

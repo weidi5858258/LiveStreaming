@@ -188,7 +188,6 @@ public class MediaClientService extends Service {
     private MediaCodec mVideoEncoderMediaCodecLandscape;
     private MediaFormat mVideoEncoderMediaFormatPortrait;
     private MediaFormat mVideoEncoderMediaFormatLandscape;
-    private ArrayBlockingQueue<byte[]> mPlayQueue = null;
     private OrientationListener myOrientationListener;
     private boolean enable = false;
     private int mPreOrientation;
@@ -335,11 +334,6 @@ public class MediaClientService extends Service {
         mSurfaceLandscape = null;
         mVideoEncoderCodecName = null;
         mVideoMime = null;
-
-        if (mPlayQueue != null) {
-            mPlayQueue.clear();
-            mPlayQueue = null;
-        }
         Log.i(TAG, "releaseAll end");
     }
 
@@ -354,6 +348,18 @@ public class MediaClientService extends Service {
         }
 
         Log.i(TAG, "startScreenRecordForNative() start");
+
+        String str = mMyJni.onTransact(
+                MyJni.DO_SOMETHING_CODE_init_rtmp, null);
+        if (TextUtils.isEmpty(str)) {
+            releaseAll();
+            return false;
+        }
+        if (Integer.parseInt(str) < 0) {
+            Log.e(TAG, "startScreenRecordForNative() DO_SOMETHING_CODE_init_rtmp failed");
+            releaseAll();
+            return false;
+        }
 
         if (TextUtils.isEmpty(mVideoEncoderCodecName)) {
             mVideoEncoderCodecName = MyJni.getEncoderCodecName(MediaFormat.MIMETYPE_VIDEO_AVC);
@@ -418,9 +424,10 @@ public class MediaClientService extends Service {
                 sb.length(), tempOrientation, width, height};
         jniObject.valueStringArray = new String[]{
                 sb.toString(), mVideoMime, mVideoEncoderCodecName};
-        String str = mMyJni.onTransact(
+        str = mMyJni.onTransact(
                 MyJni.DO_SOMETHING_CODE_start_screen_record_prepare, jniObject);
         if (TextUtils.isEmpty(str)) {
+            releaseAll();
             return false;
         }
         boolean ret = Boolean.parseBoolean(str);
@@ -432,8 +439,6 @@ public class MediaClientService extends Service {
                             mContext, "没有连接上服务端", Toast.LENGTH_SHORT).show();
                 }
             });*/
-            mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
-            mActivity = null;
             releaseAll();
             return false;
         }

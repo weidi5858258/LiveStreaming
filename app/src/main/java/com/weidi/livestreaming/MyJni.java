@@ -50,7 +50,7 @@ public class MyJni {
 
     // java ---> jni
     public static final int DO_SOMETHING_CODE_init = 1000;
-    public static final int DO_SOMETHING_CODE_Server_accept = 1001;
+    public static final int DO_SOMETHING_CODE_init_rtmp = 1001;
     public static final int DO_SOMETHING_CODE_Client_connect = 1002;
     public static final int DO_SOMETHING_CODE_Client_disconnect = 1003;
     public static final int DO_SOMETHING_CODE_Client_send_data = 1004;

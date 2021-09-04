@@ -148,11 +148,11 @@ void MediaCodec::startScreenRecordEncoderMediaCodec(
 
 void MediaCodec::startScreenRecord() {
     if (_isDoing) {
-        LOGE("startScreenRecord() return for _isDoing is true\n");
+        LOGE("MediaCodec::startScreenRecord() return for _isDoing is true\n");
         return;
     }
 
-    LOGI("startScreenRecord() start\n");
+    LOGI("MediaCodec::startScreenRecord() start\n");
     _isDoing = true;
 
     createPortraitVirtualDisplay();
@@ -171,7 +171,9 @@ void MediaCodec::startScreenRecord() {
     pthread_attr_setschedparam(&attr, &param);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_create(&p_tids_receive_data, &attr, startEncoder, this);
-    LOGI("startScreenRecord() end\n");
+    LOGI("MediaCodec::startScreenRecord() end\n");
+
+    _send->start();
 }
 
 void MediaCodec::startAudioRecordEncoderMediaCodec(
@@ -208,11 +210,11 @@ void *MediaCodec::startEncoder(void *arg) {
     int64_t end_time = 0;
     LOGI("startEncoder() start\n");
     while (mediaCodec->_isDoing) {
-        end_time = currentTimeMillis();
+        /*end_time = currentTimeMillis();
         if (end_time - start_time >= 1000) {
             // 申请关键帧
             start_time = end_time;
-        }
+        }*/
         mediaCodec->drainOutputBuffer(mediaCodec->_codec, true, false);
     }
     LOGI("startEncoder() end\n");
@@ -650,7 +652,7 @@ void MediaCodec::getSpsPps() {
     bool isGettingSpsPps = true;
     AMediaCodecBufferInfo roomInfo;
     size_t out_size = 0;
-    LOGI("getSpsPps() start\n");
+    LOGI("MediaCodec::getSpsPps() start\n");
     while (isGettingSpsPps) {
         for (;;) {
             ssize_t roomIndex = AMediaCodec_dequeueOutputBuffer(_codec, &roomInfo, TIME_OUT);
@@ -661,13 +663,14 @@ void MediaCodec::getSpsPps() {
             if (room != nullptr && (roomInfo.flags & 2)) {// 配置帧
                 isGettingSpsPps = false;
                 _mark = handleSpsPps(room, roomInfo);
+                LOGI("MediaCodec::getSpsPps() _mark: %d\n", _mark);
                 AMediaCodec_releaseOutputBuffer(_codec, roomIndex, false);
                 break;
             }
             AMediaCodec_releaseOutputBuffer(_codec, roomIndex, false);
         }
     }
-    LOGI("getSpsPps() end\n");
+    LOGI("MediaCodec::getSpsPps() end\n");
 }
 
 void MediaCodec::screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {

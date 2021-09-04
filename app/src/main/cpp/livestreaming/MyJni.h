@@ -19,7 +19,7 @@ enum {
 enum DO_SOMETHING_CODE {
     // java ---> jni
     DO_SOMETHING_CODE_init = 1000,
-    DO_SOMETHING_CODE_Server_accept = 1001,
+    DO_SOMETHING_CODE_init_rtmp = 1001,
     DO_SOMETHING_CODE_Client_connect = 1002,
     DO_SOMETHING_CODE_Client_disconnect = 1003,
     DO_SOMETHING_CODE_Client_send_data = 1004,

@@ -153,6 +153,41 @@ void createPortraitVirtualDisplay() {
 
 /////////////////////////////////////////////////////////////////////////
 
+static jint onTransact_stop(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject) {
+    send->gameOver();
+    audioRecord->gameOver();
+    screenRecordMediaCodec->gameOver();
+    audioRecordMediaCodec->gameOver();
+    return JNI_OK;
+}
+
+static jint onTransact_release(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject) {
+    if (rtmp) {
+        if (RTMP_IsConnected(rtmp)) {
+            RTMP_Close(rtmp);
+        }
+        RTMP_Free(rtmp);
+        rtmp = nullptr;
+    }
+    if (screenRecordMediaCodec) {
+        delete screenRecordMediaCodec;
+        screenRecordMediaCodec = nullptr;
+    }
+    if (audioRecordMediaCodec) {
+        delete audioRecordMediaCodec;
+        audioRecordMediaCodec = nullptr;
+    }
+    if (audioRecord) {
+        delete audioRecord;
+        audioRecord = nullptr;
+    }
+    if (send) {
+        delete send;
+        send = nullptr;
+    }
+    return JNI_OK;
+}
+
 static jint onTransact_init(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject) {
     if (jniObject_jclass != nullptr) {
         env->DeleteGlobalRef(jniObject_jclass);
@@ -212,16 +247,46 @@ static jint onTransact_init(JNIEnv *env, jobject myJniObject, jint code, jobject
     env->DeleteLocalRef(MyJniClass);
     MyJniClass = nullptr;
 
+    return (jint) 0;
+}
+
+static jint onTransact_init_rtmp(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject) {
+    do {
+        rtmp = RTMP_Alloc();
+        RTMP_Init(rtmp);
+        rtmp->Link.timeout = 10;
+        if (!RTMP_SetupURL(rtmp, "rtmp://192.168.43.182/live/stream")) {
+            LOGE("onTransact_init_rtmp() RTMP_SetupURL");
+            onTransact_release(env, myJniObject, code, jniObject);
+            return JNI_ERR;
+        }
+        RTMP_EnableWrite(rtmp);
+        if (!RTMP_Connect(rtmp, NULL)) {
+            LOGE("onTransact_init_rtmp() RTMP_Connect");
+            onTransact_release(env, myJniObject, code, jniObject);
+            return JNI_ERR;
+        }
+        if (!RTMP_ConnectStream(rtmp, 0)) {
+            LOGE("onTransact_init_rtmp() RTMP_ConnectStream");
+            onTransact_release(env, myJniObject, code, jniObject);
+            return JNI_ERR;
+        }
+    } while (0);
+
+    LOGI("onTransact_init_rtmp() success");
     screenRecordMediaCodec = new MediaCodec();
     audioRecordMediaCodec = new MediaCodec();
     audioRecord = new AudioRecord();
     send = new Send();
 
-    return (jint) 0;
-}
+    send->setRTMP(rtmp);
+    screenRecordMediaCodec->setRTMP(rtmp);
+    screenRecordMediaCodec->setSend(send);
+    audioRecordMediaCodec->setRTMP(rtmp);
+    audioRecordMediaCodec->setSend(send);
+    audioRecord->setMediaCodec(audioRecordMediaCodec);
 
-static jint onTransact_init_rtmp(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject) {
-
+    return JNI_OK;
 }
 
 static jint onTransact_closeJni(JNIEnv *env, jobject thiz,
@@ -263,6 +328,10 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
         case DO_SOMETHING_CODE_init: {
             return env->NewStringUTF(
                     std::to_string(onTransact_init(env, thiz, code, jniObject)).c_str());
+        }
+        case DO_SOMETHING_CODE_init_rtmp: {
+            return env->NewStringUTF(
+                    std::to_string(onTransact_init_rtmp(env, thiz, code, jniObject)).c_str());
         }
         case DO_SOMETHING_CODE_start_screen_record_prepare: {
             jobject intArrayObject = env->GetObjectField(jniObject, valueIntArray_jfieldID);
@@ -331,21 +400,6 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
         case DO_SOMETHING_CODE_stop_audio_record: {
             audioRecord->gameOver();
 
-            do {
-                rtmp = RTMP_Alloc();
-                RTMP_Init(rtmp);
-                rtmp->Link.timeout = 10;
-                if (!RTMP_SetupURL(rtmp, "")) {
-                    break;
-                }
-                RTMP_EnableWrite(rtmp);
-                if (!RTMP_Connect(rtmp, 0)) {
-                    break;
-                }
-                if (!RTMP_ConnectStream(rtmp, 0)) {
-                    break;
-                }
-            } while (0);
 
             return env->NewStringUTF(ret);
         }
