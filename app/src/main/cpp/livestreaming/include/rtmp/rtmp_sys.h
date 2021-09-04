@@ -64,6 +64,7 @@
 #include "rtmp.h"
 
 #ifdef USE_POLARSSL
+
 #include <polarssl/net.h>
 #include <polarssl/ssl.h>
 #include <polarssl/havege.h>
@@ -84,6 +85,7 @@ typedef struct tls_ctx {
 #define TLS_close(s)	ssl_free(s); free(s)
 
 #elif defined(USE_GNUTLS)
+
 #include <gnutls/gnutls.h>
 typedef struct tls_ctx {
 	gnutls_certificate_credentials_t cred;
@@ -99,6 +101,7 @@ typedef struct tls_ctx {
 #define TLS_close(s)	gnutls_deinit(s)
 
 #else	/* USE_OPENSSL */
+
 #define TLS_CTX	SSL_CTX *
 #define TLS_client(ctx,s)	s = SSL_new(ctx)
 #define TLS_setfd(s,fd)	SSL_set_fd(s,fd)

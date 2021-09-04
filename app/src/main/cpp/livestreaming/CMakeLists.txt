@@ -30,6 +30,12 @@ add_library(livestreaming
 
         SHARED
 
+#        rtmp/amf.c
+#        rtmp/hashswf.c
+#        rtmp/log.c
+#        rtmp/parseurl.c
+#        rtmp/rtmp.c
+
         MyJni.cpp
         MediaCodec.cpp
         AudioRecord.cpp

@@ -25,7 +25,7 @@
  *  http://www.gnu.org/copyleft/lgpl.html
  */
 
-#include "../../../../../../../../../tools/android_sdk/ndk/16.1.4479499/sources/cxx-stl/llvm-libc++/include/stdint.h"
+#include <stdint.h>
 
 #ifndef TRUE
 #define TRUE	1
