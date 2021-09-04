@@ -7,14 +7,12 @@
 
 #include <pthread.h>
 #include <list>
-#include "include/rtmp.h"
+extern "C" {
+#include "include/rtmp/rtmp.h"
+};
 
 class Send {
 private:
-    MediaCodec *videoMediaCodec = nullptr;
-    MediaCodec *audioMediaCodec = nullptr;
-    AudioRecord *audioRecord = nullptr;
-
     pthread_mutex_t h264_mutex;
     pthread_cond_t h264_cond;
 
@@ -24,25 +22,18 @@ private:
     std::list<RTMPPacket *> h264_list;
     std::list<RTMPPacket *> aac_list;
     bool isDoing;
+    RTMP* _rtmp;
 public:
     Send();
 
     ~Send();
 
-    void setVideoMediaCodec(MediaCodec *codec) {
-        videoMediaCodec = codec;
-    }
-
-    void setAudioMediaCodec(MediaCodec *codec) {
-        audioMediaCodec = codec;
-    }
-
-    void setAudioRecord(AudioRecord *record) {
-        audioRecord = record;
-    }
-
     void gameOver() {
         isDoing = false;
+    }
+
+    void setRTMP(RTMP *rtmp) {
+        this->_rtmp = rtmp;
     }
 
     void putH264(RTMPPacket *packet);

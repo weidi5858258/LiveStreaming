@@ -29,9 +29,9 @@
 #define CRYPTO
 #endif
 
-#include <errno.h>
-#include <stdint.h>
-#include <stddef.h>
+#include "../../../../../../../../../tools/android_sdk/ndk/16.1.4479499/sources/cxx-stl/llvm-libc++/include/errno.h"
+#include "../../../../../../../../../tools/android_sdk/ndk/16.1.4479499/sources/cxx-stl/llvm-libc++/include/stdint.h"
+#include "../../../../../../../../../tools/android_sdk/ndk/16.1.4479499/sources/cxx-stl/llvm-libc++/include/stddef.h"
 
 #include "amf.h"
 

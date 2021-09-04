@@ -164,4 +164,21 @@ endif (${ANDROID_ABI} STREQUAL "x86")
 #        # 库的路径
 #        PROPERTIES IMPORTED_LOCATION
 #        ${LIBS_DIR}/${CPU_DIR}/libijkffmpeg.so)
+
+# 添加库
+add_library(
+        # 库名称
+        librtmp
+        # 动态库
+        SHARED
+        # 表示该库是引用的不是生成的
+        IMPORTED)
+# 引用库
+set_target_properties(
+        # 库名称
+        librtmp
+        # 库的路径
+        PROPERTIES IMPORTED_LOCATION
+        ${LIBS_DIR}/${CPU_DIR}/librtmp.so)
+        #${CMAKE_CURRENT_SOURCE_DIR}/../../nativeLibs/${ANDROID_ABI}/librtmp.so)
 #################################################################

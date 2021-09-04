@@ -6,7 +6,6 @@
 #include <string>
 #include <sys/system_properties.h>
 #include "include/Log.h"
-#include "include/rtmp.h"
 #include "MyJni.h"
 #include "MediaCodec.h"
 #include "AudioRecord.h"
@@ -58,6 +57,7 @@ static MediaCodec *screenRecordMediaCodec = nullptr;
 static MediaCodec *audioRecordMediaCodec = nullptr;
 static AudioRecord *audioRecord = nullptr;
 static Send *send = nullptr;
+static RTMP *rtmp = nullptr;
 
 /***
  called at the library loaded.
@@ -149,28 +149,6 @@ void createPortraitVirtualDisplay() {
     if (isAttached) {
         gJavaVm->DetachCurrentThread();
     }
-}
-
-/*
- 怎么到达这里的呢?
- 首先这是个回调函数,被设置给MediaCodec.
- 在MediaCodec中,当录制屏幕时,屏幕数据不断的被编码成h264数据,然后被回调到这里.
- */
-void screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {
-    // data就是录制屏幕后编码成h264的数据
-    // 然后进行封装
-    // 最后进行发送
-    //LOGI("screenRecordCallback() presentationTimeUs: %lld", info.presentationTimeUs);
-
-
-
-    
-}
-
-void audioRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {
-    // data就是音频采集后编码成aac的数据
-    // 然后进行封装
-    // 最后进行发送
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -333,7 +311,7 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
             return env->NewStringUTF("false");
         }
         case DO_SOMETHING_CODE_start_screen_record: {
-            screenRecordMediaCodec->setCallBack(screenRecordCallback);
+            //screenRecordMediaCodec->setCallBack(screenRecordCallback);
             screenRecordMediaCodec->startScreenRecord();
             return env->NewStringUTF(ret);
         }
@@ -345,13 +323,30 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_start_audio_record: {
-            audioRecordMediaCodec->setCallBack(audioRecordCallback);
+            //audioRecordMediaCodec->setCallBack(audioRecordCallback);
             audioRecord->setMediaCodec(audioRecordMediaCodec);
             audioRecord->startRecording();
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_stop_audio_record: {
             audioRecord->gameOver();
+
+            do {
+                rtmp = RTMP_Alloc();
+                RTMP_Init(rtmp);
+                rtmp->Link.timeout = 10;
+                if (!RTMP_SetupURL(rtmp, "")) {
+                    break;
+                }
+                RTMP_EnableWrite(rtmp);
+                if (!RTMP_Connect(rtmp, 0)) {
+                    break;
+                }
+                if (!RTMP_ConnectStream(rtmp, 0)) {
+                    break;
+                }
+            } while (0);
+
             return env->NewStringUTF(ret);
         }
         default:

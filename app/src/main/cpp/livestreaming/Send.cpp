@@ -5,16 +5,13 @@
 #include "MediaCodec.h"
 #include "AudioRecord.h"
 #include "include/Log.h"
-#include "include/rtmp.h"
 #include "Send.h"
 
 #define LOG "player_alexander"
 
 Send::Send() :
-        videoMediaCodec(NULL),
-        audioMediaCodec(NULL),
-        audioRecord(NULL),
-        isDoing(false) {
+        isDoing(false),
+        _rtmp(nullptr) {
     LOGI("Send::Send()");
     h264_mutex = PTHREAD_MUTEX_INITIALIZER;
     h264_cond = PTHREAD_COND_INITIALIZER;
@@ -58,6 +55,12 @@ void Send::sendH264() {
         pthread_mutex_unlock(&h264_mutex);
 
         // send
+        if (_rtmp) {
+            RTMP_SendPacket(_rtmp, packet, 1);
+        }
+        RTMPPacket_Free(packet);
+        free(packet);
+        packet = nullptr;
     }
 }
 

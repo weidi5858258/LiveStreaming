@@ -5,7 +5,7 @@
 #ifndef USEFRAGMENTS_LOG_H
 #define USEFRAGMENTS_LOG_H
 
-#include <android/log.h>
+#include "android/log.h"
 
 #define NEED_LOG
 

@@ -16,7 +16,6 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import static com.weidi.livestreaming.Constants.CREATE_SCREEN_CAPTURE_INTENT;
-import static com.weidi.livestreaming.Constants.INTERNAL_ON_RESUME;
 import static com.weidi.livestreaming.Constants.RELEASE;
 import static com.weidi.livestreaming.Constants.SET_ACTIVITY;
 import static com.weidi.livestreaming.Constants.SET_MEDIAPROJECTION;

@@ -13,7 +13,22 @@
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
 
+#include "Send.h"
+
 class MediaCodec {
+public:
+    enum MARK {
+        // unknow
+        MARK0 = 0,
+        // 0 0 0 1
+        MARK1 = 1,
+        //   0 0 1
+        MARK2 = 2,
+        // ... 103 ... 104 ...
+        MARK3 = 3,
+        // ...  39 ... 40 ...
+        MARK4 = 4
+    };
 private:
     ANativeWindow *_surface = nullptr;
     AMediaFormat *_format;
@@ -32,9 +47,12 @@ private:
     int _pps_length;
     int _width;
     int _height;
+    MARK _mark;
 
     bool _isDoing;
-
+    bool _isVideo;
+    Send *_send;
+    RTMP *_rtmp;
 public:
     MediaCodec();
 
@@ -61,9 +79,9 @@ public:
         _isDoing = false;
     }
 
-    void setCallBack(void (*callback)(AMediaCodecBufferInfo &, uint8_t *)) {
+    /*void setCallBack(void (*callback)(MARK mark, AMediaCodecBufferInfo &, uint8_t *)) {
         _callback = callback;
-    }
+    }*/
 
     ANativeWindow *getScreenRecordSurface() {
         return _surface;
@@ -79,10 +97,18 @@ public:
             const char *mime, const char *codec_name,
             int sampleRate, int channelCount, int channelConfig, int maxInputSize);
 
-private:
-    int handleSpsPps(uint8_t *sps_pps, ssize_t size);
+    void setSend(Send *send) {
+        this->_send = send;
+    }
 
-    int handleSpsPps(AMediaFormat *pFormat, uint8_t *sps_pps, ssize_t size);
+    void setRTMP(RTMP *rtmp) {
+        this->_rtmp = rtmp;
+    }
+
+private:
+    MARK handleSpsPps(uint8_t *sps_pps, AMediaCodecBufferInfo &info);
+
+    MARK handleSpsPps(AMediaFormat *pFormat, uint8_t *sps_pps, ssize_t size);
 
     void getSpsPps();
 
@@ -92,9 +118,13 @@ private:
 
     bool drainOutputBuffer(AMediaCodec *codec, bool release, bool render);
 
-    void (*_callback)(AMediaCodecBufferInfo &info, uint8_t *data);
+    //void (*_callback)(MARK mark, AMediaCodecBufferInfo &info, uint8_t *data);
 
     static void *startEncoder(void *arg);
+
+    void screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data);
+
+    void audioRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data);
 };
 
 #endif //MIRRORCAST_MEDIACODEC_H

@@ -14,6 +14,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <limits.h>
+#include <sys/time.h>
+#include <time.h>
 
 #include "include/Log.h"
 #include "MyJni.h"
@@ -22,6 +24,15 @@
 #define LOG "player_alexander"
 
 static int TIME_OUT = 10000;
+
+static int64_t currentTimeMillis() {
+    struct timeval tv;          //获取一个时间结构
+    gettimeofday(&tv, NULL);//获取当前时间
+    int64_t t = tv.tv_sec;
+    t *= 1000;
+    t += tv.tv_usec / 1000;
+    return t;
+}
 
 MediaCodec::MediaCodec() :
         _surface(nullptr),
@@ -40,7 +51,8 @@ MediaCodec::MediaCodec() :
         _width(0),
         _height(0),
         _isDoing(false),
-        _callback(nullptr) {
+        _send(nullptr),
+        _rtmp(nullptr) {
     LOGI("MediaCodec::MediaCodec()");
 }
 
@@ -63,7 +75,6 @@ MediaCodec::~MediaCodec() {
         _sps_pps = nullptr;
         _sps_pps_length = 0;
     }
-    _callback = nullptr;
 }
 
 /*
@@ -112,6 +123,7 @@ void MediaCodec::startScreenRecordEncoderMediaCodec(
         return;
     }
 
+    _isVideo = true;
     AMediaFormat *pFormat = AMediaFormat_new();
     AMediaFormat_setString(pFormat, AMEDIAFORMAT_KEY_MIME, mime);
     AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_WIDTH, width);
@@ -169,6 +181,7 @@ void MediaCodec::startAudioRecordEncoderMediaCodec(
         return;
     }
 
+    _isVideo = false;
     AMediaFormat *pFormat = AMediaFormat_new();
     AMediaFormat_setString(pFormat, AMEDIAFORMAT_KEY_MIME, mime);
     AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_SAMPLE_RATE, sampleRate);
@@ -191,9 +204,15 @@ void MediaCodec::startAudioRecordEncoderMediaCodec(
 
 void *MediaCodec::startEncoder(void *arg) {
     MediaCodec *mediaCodec = (MediaCodec *) arg;
-
+    int64_t start_time = currentTimeMillis();
+    int64_t end_time = 0;
     LOGI("startEncoder() start\n");
     while (mediaCodec->_isDoing) {
+        end_time = currentTimeMillis();
+        if (end_time - start_time >= 1000) {
+            // 申请关键帧
+            start_time = end_time;
+        }
         mediaCodec->drainOutputBuffer(mediaCodec->_codec, true, false);
     }
     LOGI("startEncoder() end\n");
@@ -280,8 +299,10 @@ bool MediaCodec::drainOutputBuffer(AMediaCodec *codec, bool release, bool render
         }
 
         // 处理数据
-        if (_callback) {
-            _callback(info, room);
+        if (_isVideo) {
+            screenRecordCallback(info, room);
+        } else {
+            audioRecordCallback(info, room);
         }
 
         if (release) {
@@ -292,8 +313,8 @@ bool MediaCodec::drainOutputBuffer(AMediaCodec *codec, bool release, bool render
     return true;
 }
 
-int MediaCodec::handleSpsPps(AMediaFormat *pFormat, uint8_t *sps_pps, ssize_t size) {
-    // unknow
+MediaCodec::MARK MediaCodec::handleSpsPps(AMediaFormat *pFormat, uint8_t *sps_pps, ssize_t size) {
+    /*// unknow
     static int MARK0 = 0;
     // 0 0 0 1
     static int MARK1 = 1;
@@ -302,13 +323,13 @@ int MediaCodec::handleSpsPps(AMediaFormat *pFormat, uint8_t *sps_pps, ssize_t si
     // ... 103 ... 104 ...
     static int MARK3 = 3;
     // ...  39 ... 40 ...
-    static int MARK4 = 4;
+    static int MARK4 = 4;*/
 
     uint8_t *sps = nullptr;
     uint8_t *pps = nullptr;
     size_t sps_size = 0;
     size_t pps_size = 0;
-    int mark = MARK0;
+    MARK mark = MARK0;
     int index = -1;
     if (sps_pps[0] == 0
         && sps_pps[1] == 0
@@ -434,23 +455,9 @@ int MediaCodec::handleSpsPps(AMediaFormat *pFormat, uint8_t *sps_pps, ssize_t si
     return mark;
 }
 
-int MediaCodec::handleSpsPps(uint8_t *sps_pps, ssize_t size) {
-    // unknow
-    static int MARK0 = 0;
-    // 0 0 0 1
-    static int MARK1 = 1;
-    //   0 0 1
-    static int MARK2 = 2;
-    // ... 103 ... 104 ...
-    static int MARK3 = 3;
-    // ...  39 ... 40 ...
-    static int MARK4 = 4;
-
-    //uint8_t *_sps = nullptr;
-    //uint8_t *_pps = nullptr;
-    //size_t _sps_length = 0;
-    //size_t _pps_length = 0;
-    int mark = MARK0;
+MediaCodec::MARK MediaCodec::handleSpsPps(uint8_t *sps_pps, AMediaCodecBufferInfo &info) {
+    int32_t size = info.size;
+    MARK mark = MARK0;
     int index = -1;
     if (sps_pps[0] == 0
         && sps_pps[1] == 0
@@ -486,14 +493,24 @@ int MediaCodec::handleSpsPps(uint8_t *sps_pps, ssize_t size) {
 
     if (index != -1) {
         // region
-        _sps_length = index;
-        _pps_length = size - index;
+        if (mark == MARK1) {
+            _sps_length = index - 4;
+            _pps_length = size - index - 4;
+        } else if (mark == MARK2) {
+            _sps_length = index - 3;
+            _pps_length = size - index - 3;
+        }
         _sps = (uint8_t *) malloc(_sps_length);
         _pps = (uint8_t *) malloc(_pps_length);
         memset(_sps, 0, _sps_length);
         memset(_pps, 0, _pps_length);
-        memcpy(_sps, sps_pps, _sps_length);
-        memcpy(_pps, sps_pps + index, _pps_length);
+        if (mark == MARK1) {
+            memcpy(_sps, sps_pps + 4, _sps_length);
+            memcpy(_pps, sps_pps + index + 4, _pps_length);
+        } else if (mark == MARK2) {
+            memcpy(_sps, sps_pps + 3, _sps_length);
+            memcpy(_pps, sps_pps + index + 3, _pps_length);
+        }
         // endregion
     } else {
         // region ... 103 ... 104 ...
@@ -547,26 +564,80 @@ int MediaCodec::handleSpsPps(uint8_t *sps_pps, ssize_t size) {
 
         // region
         if (spsIndex != -1 && ppsIndex != -1) {
+            if (mark == MARK3) {
+
+            } else if (mark == MARK4) {
+
+            }
+            if (mark == MARK3) {
+
+            } else if (mark == MARK4) {
+
+            }
             _sps_length = spsLength;
             _pps_length = ppsLength;
-            _sps = (uint8_t *) malloc(spsLength + 4);
-            _pps = (uint8_t *) malloc(ppsLength + 4);
-            memset(_sps, 0, spsLength + 4);
-            memset(_pps, 0, ppsLength + 4);
+            _sps = (uint8_t *) malloc(_sps_length);
+            _pps = (uint8_t *) malloc(_pps_length);
+            memset(_sps, 0, _sps_length);
+            memset(_pps, 0, _pps_length);
 
-            // 0x00, 0x00, 0x00, 0x01
-            _sps[0] = _pps[0] = 0x00;
-            _sps[1] = _pps[1] = 0x00;
-            _sps[2] = _pps[2] = 0x00;
-            _sps[3] = _pps[3] = 0x01;
-            memcpy(_sps + 4, sps_pps + spsIndex, spsLength);
-            memcpy(_pps + 4, sps_pps + ppsIndex, ppsLength);
+            memcpy(_sps, sps_pps + spsIndex, _sps_length);
+            memcpy(_pps, sps_pps + ppsIndex, _pps_length);
         }
         // endregion
     }
 
     if (_sps != nullptr && _pps != nullptr) {
+        RTMPPacket *packet = nullptr;
+        int body_size = 16 + _sps_length + _pps_length;
+        packet = (RTMPPacket *) malloc(sizeof(RTMPPacket));
+        RTMPPacket_Alloc(packet, body_size);
+        RTMPPacket_Reset(packet);
+        // 帧类型数据 : 分为两部分;
+        // 前 4 位表示帧类型, 1 表示关键帧, 2 表示普通帧
+        // 后 4 位表示编码类型, 7 表示 AVC 视频编码
+        packet->m_body[0] = 0x17;
+        // 数据类型, 00 表示 AVC 序列头
+        packet->m_body[1] = 0x00;
+        packet->m_body[2] = 0x00;
+        packet->m_body[3] = 0x00;
+        packet->m_body[4] = 0x00;
+        // 版本信息
+        packet->m_body[5] = 0x01;
+        // 编码规格
+        packet->m_body[6] = _sps[1];
+        packet->m_body[7] = _sps[2];
+        packet->m_body[8] = _sps[3];
+        // NALU长度
+        packet->m_body[9] = 0xFF;
+        // SPS个数
+        packet->m_body[10] = 0xE1;
+        // SPS长度, 占 2 字节
+        // 设置长度的高位
+        packet->m_body[11] = (_sps_length >> 8) & 0xFF;
+        // 设置长度的低位
+        packet->m_body[12] = _sps_length & 0xFF;
+        // 拷贝SPS数据
+        // 将SPS数据拷贝到 rtmpPacket->m_body[nextPosition]地址中
+        memcpy(&packet->m_body[13], _sps, _sps_length);
+        // PPS个数
+        packet->m_body[13 + _sps_length] = 0x01;
+        // PPS数据的长度, 占 2 字节
+        // 设置长度的高位
+        packet->m_body[14 + _sps_length] = (_pps_length >> 8) & 0xFF;
+        // 设置长度的低位
+        packet->m_body[15 + _sps_length] = _pps_length & 0xFF;
+        // 拷贝PPS数据
+        memcpy(&packet->m_body[16 + _sps_length], _pps, _pps_length);
+        packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
+        packet->m_nBodySize = body_size;
+        packet->m_nChannel = 0x04;
+        packet->m_nTimeStamp = info.presentationTimeUs / 1000;//
+        packet->m_hasAbsTimestamp = 0;
+        packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
+        packet->m_nInfoField2 = _rtmp->m_stream_id;
 
+        _send->putH264(packet);
     } else {
         // 实在找不到sps和pps的数据了
         mark = MARK0;
@@ -589,7 +660,7 @@ void MediaCodec::getSpsPps() {
             uint8_t *room = AMediaCodec_getOutputBuffer(_codec, (size_t) roomIndex, &out_size);
             if (room != nullptr && (roomInfo.flags & 2)) {// 配置帧
                 isGettingSpsPps = false;
-                handleSpsPps(room, roomInfo.size);
+                _mark = handleSpsPps(room, roomInfo);
                 AMediaCodec_releaseOutputBuffer(_codec, roomIndex, false);
                 break;
             }
@@ -599,7 +670,50 @@ void MediaCodec::getSpsPps() {
     LOGI("getSpsPps() end\n");
 }
 
+void MediaCodec::screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {
+    // data就是录制屏幕后编码成h264的数据
+    // 然后进行封装
+    // 最后进行发送
+    //LOGI("screenRecordCallback() presentationTimeUs: %lld", info.presentationTimeUs);
+    RTMPPacket *packet = nullptr;
+    int32_t size = info.size;
+    int body_size = 9 + size;
+    packet = (RTMPPacket *) malloc(sizeof(RTMPPacket));
+    RTMPPacket_Alloc(packet, body_size);
+    RTMPPacket_Reset(packet);
 
+    if (info.flags & 1) {
+        //关键帧
+        packet->m_body[0] = 0x17;
+    } else {
+        // 非关键帧
+        packet->m_body[0] = 0x27;
+    }
+    packet->m_body[1] = 0x01;
+    packet->m_body[2] = 0x00;
+    packet->m_body[3] = 0x00;
+    packet->m_body[4] = 0x00;
+    packet->m_body[5] = (size >> 24) & 0xFF;
+    packet->m_body[6] = (size >> 16) & 0xFF;
+    packet->m_body[7] = (size >> 8) & 0xFF;
+    packet->m_body[8] = size & 0xFF;
+    memcpy(&packet->m_body[9], data, size);
+    packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
+    packet->m_nBodySize = body_size;
+    packet->m_nChannel = 0x04;
+    packet->m_nTimeStamp = info.presentationTimeUs / 1000;//
+    packet->m_hasAbsTimestamp = 0;
+    packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
+    packet->m_nInfoField2 = _rtmp->m_stream_id;
+
+    _send->putH264(packet);
+}
+
+void MediaCodec::audioRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {
+    // data就是音频采集后编码成aac的数据
+    // 然后进行封装
+    // 最后进行发送
+}
 
 
 
