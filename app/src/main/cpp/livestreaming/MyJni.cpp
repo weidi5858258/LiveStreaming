@@ -59,6 +59,7 @@ static AudioRecord *audioRecord = nullptr;
 static Send *send = nullptr;
 static RTMP *rtmp = nullptr;
 
+static pthread_mutex_t release_mutex = PTHREAD_MUTEX_INITIALIZER;
 int release_count = 0;
 
 /***
@@ -165,7 +166,9 @@ static jint onTransact_stop(JNIEnv *env, jobject myJniObject, jint code, jobject
 
 jint onTransact_release(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject) {
     LOGI("onTransact_release() start");
-    if (release_count < 2) {
+    pthread_mutex_lock(&release_mutex);
+    release_count++;
+    if (release_count < 2) {//4
         return JNI_ERR;
     }
     if (rtmp) {
@@ -192,6 +195,7 @@ jint onTransact_release(JNIEnv *env, jobject myJniObject, jint code, jobject jni
         send = nullptr;
     }
     release_count = 0;
+    pthread_mutex_unlock(&release_mutex);
     LOGI("onTransact_release() end");
     return JNI_OK;
 }
@@ -394,6 +398,7 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
         }
         case DO_SOMETHING_CODE_stop_screen_record: {
             onTransact_stop(env, thiz, code, jniObject);
+            onTransact_release(nullptr, nullptr, 0, nullptr);
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_start_audio_record_prepare: {

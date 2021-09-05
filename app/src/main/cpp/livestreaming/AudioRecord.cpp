@@ -16,8 +16,6 @@
 
 #define RECORDER_FRAMES 2048
 
-extern int release_count;
-
 static pthread_mutex_t audioEngineLock = PTHREAD_MUTEX_INITIALIZER;
 
 AudioRecord::AudioRecord() :
@@ -221,7 +219,6 @@ void AudioRecord::bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *con
         if (SL_RESULT_SUCCESS == result) {
             //recorderSize = RECORDER_FRAMES * sizeof(short);
         }
-        release_count++;
         onTransact_release(nullptr, nullptr, 0, nullptr);
     }
 

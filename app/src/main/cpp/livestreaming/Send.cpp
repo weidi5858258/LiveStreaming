@@ -10,8 +10,6 @@
 
 #define LOG "player_alexander"
 
-extern int release_count;
-
 Send::Send() :
         _isDoing(false),
         _rtmp(nullptr) {
@@ -94,7 +92,6 @@ void *Send::sendH264(void *arg) {
         packet = nullptr;
     }
     LOGI("Send::sendH264() end");
-    release_count++;
     onTransact_release(nullptr, nullptr, 0, nullptr);
 }
 
@@ -129,7 +126,6 @@ void *Send::sendAac(void *arg) {
         packet = nullptr;
     }
     LOGI("Send::sendAac() end");
-    release_count++;
     onTransact_release(nullptr, nullptr, 0, nullptr);
 }
 

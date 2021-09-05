@@ -24,7 +24,6 @@ import android.view.Surface;
 import android.view.View;
 import android.view.WindowManager;
 
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -40,10 +39,7 @@ import static com.weidi.livestreaming.Constants.STOP_SCREEN_RECORD;
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_find_createLandscapeVirtualDisplay;
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_find_createPortraitVirtualDisplay;
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_find_encoder_send_data_error;
-import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_fromLandscapeToPortrait;
-import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_fromPortraitToLandscape;
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_is_recording;
-import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_release_sps_pps;
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_start_screen_record;
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_stop_screen_record;
 import static com.weidi.livestreaming.MyJni.ENCODER_MEDIA_CODEC_GO_JNI;
@@ -149,7 +145,7 @@ public class MediaClientService extends Service {
         }
         if (ENCODER_MEDIA_CODEC_GO_JNI) {
             // notify to jni for free sps_pps
-            mMyJni.onTransact(DO_SOMETHING_CODE_release_sps_pps, null);
+            //mMyJni.onTransact(DO_SOMETHING_CODE_release_sps_pps, null);
         }
         EventBusUtils.unregister(this);
     }
@@ -582,14 +578,14 @@ public class MediaClientService extends Service {
                 if (mPreOrientation == Configuration.ORIENTATION_PORTRAIT) {
                     // 竖屏 ---> 横屏
                     if (ENCODER_MEDIA_CODEC_GO_JNI) {
-                        mMyJni.onTransact(DO_SOMETHING_CODE_fromPortraitToLandscape, null);
+                        //mMyJni.onTransact(DO_SOMETHING_CODE_fromPortraitToLandscape, null);
                     } else {
                         fromPortraitToLandscape();
                     }
                 } else {
                     // 横屏 ---> 竖屏
                     if (ENCODER_MEDIA_CODEC_GO_JNI) {
-                        mMyJni.onTransact(DO_SOMETHING_CODE_fromLandscapeToPortrait, null);
+                        //mMyJni.onTransact(DO_SOMETHING_CODE_fromLandscapeToPortrait, null);
                     } else {
                         fromLandscapeToPortrait();
                     }

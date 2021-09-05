@@ -23,8 +23,6 @@
 
 #define LOG "player_alexander"
 
-extern int release_count;
-
 static int TIME_OUT = 10000;
 
 static int64_t currentTimeMillis() {
@@ -215,7 +213,6 @@ void *MediaCodec::startScreenRecordEncoder(void *arg) {
         mediaCodec->drainOutputBuffer(mediaCodec->_codec, true, false);
     }
     LOGI("MediaCodec::startScreenRecordEncoder() end\n");
-    release_count++;
     onTransact_release(nullptr, nullptr, 0, nullptr);
 }
 
