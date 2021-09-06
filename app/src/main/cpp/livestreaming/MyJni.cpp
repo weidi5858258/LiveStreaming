@@ -267,7 +267,9 @@ static jint onTransact_init_rtmp(JNIEnv *env, jobject myJniObject, jint code, jo
         rtmp = RTMP_Alloc();
         RTMP_Init(rtmp);
         rtmp->Link.timeout = 10;
-        if (!RTMP_SetupURL(rtmp, "rtmp://192.168.0.108:1935/live")) {
+        //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.0.108:1935/live")) {
+        if (!RTMP_SetupURL(rtmp, "rtmp://192.168.43.182/live/stream")) {
+        //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.1.104/live/stream")) {
             LOGE("onTransact_init_rtmp() RTMP_SetupURL");
             onTransact_release(env, myJniObject, code, jniObject);
             return JNI_ERR;
@@ -392,8 +394,8 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
             return env->NewStringUTF("false");
         }
         case DO_SOMETHING_CODE_start_screen_record: {
-            screenRecordMediaCodec->startScreenRecord();
-            send->startSend();
+            //screenRecordMediaCodec->startScreenRecord();
+            //send->startSend();
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_stop_screen_record: {
@@ -402,9 +404,38 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_start_audio_record_prepare: {
-            return env->NewStringUTF(ret);
+            jobject intArrayObject = env->GetObjectField(jniObject, valueIntArray_jfieldID);
+            jobject stringArrayObject = env->GetObjectField(jniObject, valueStringArray_jfieldID);
+            if (intArrayObject != nullptr && stringArrayObject != nullptr) {
+                // int[]
+                jint *intArray = reinterpret_cast<jint *>(
+                        env->GetIntArrayElements(static_cast<jintArray>(intArrayObject), nullptr));
+                int sampleRate = intArray[0];
+                int channelCount = intArray[1];
+                int channelConfig = intArray[2];
+                int maxInputSize = intArray[3];
+                // String[]
+                jobjectArray stringArray = reinterpret_cast<jobjectArray>(stringArrayObject);
+                jstring mime_ = static_cast<jstring>(env->GetObjectArrayElement(stringArray, 0));
+                jstring codec_name_ =
+                        static_cast<jstring>(env->GetObjectArrayElement(stringArray, 1));
+                const char *mime = env->GetStringUTFChars(mime_, 0);
+                const char *codec_name = env->GetStringUTFChars(codec_name_, 0);
+
+                audioRecordMediaCodec->startAudioRecordEncoderMediaCodec(
+                        mime, codec_name, sampleRate, channelCount, channelConfig, maxInputSize);
+
+                env->ReleaseStringUTFChars(mime_, mime);
+                env->ReleaseStringUTFChars(codec_name_, codec_name);
+                env->DeleteLocalRef(intArrayObject);
+                env->DeleteLocalRef(stringArrayObject);
+                return env->NewStringUTF("true");
+            }
+            return env->NewStringUTF("false");
         }
         case DO_SOMETHING_CODE_start_audio_record: {
+            audioRecord->createEngine();
+            audioRecord->createAudioRecorder();
             audioRecord->startRecording();
             return env->NewStringUTF(ret);
         }

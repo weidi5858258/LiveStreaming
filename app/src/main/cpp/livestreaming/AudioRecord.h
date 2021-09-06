@@ -21,6 +21,10 @@ private:
     int index;
     short *recordBuffers[2];
     unsigned int recordBufferSize;
+
+    unsigned char *buffer;
+    size_t bufferSize;
+
     bool _isDoing;
 
     MediaCodec *mediaCodec;
@@ -34,6 +38,10 @@ public:
     void createAudioRecorder();
 
     void startRecording();
+
+    void stopRecording() {
+        _isDoing = false;
+    }
 
     void gameOver() {
         _isDoing = false;

@@ -13,6 +13,7 @@ import android.media.MediaFormat;
 import android.media.projection.MediaProjection;
 import android.os.Build;
 import android.os.IBinder;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
@@ -40,6 +41,7 @@ import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_find_createLandsca
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_find_createPortraitVirtualDisplay;
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_find_encoder_send_data_error;
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_is_recording;
+import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_start_audio_record;
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_start_screen_record;
 import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_stop_screen_record;
 import static com.weidi.livestreaming.MyJni.ENCODER_MEDIA_CODEC_GO_JNI;
@@ -179,7 +181,9 @@ public class MediaClientService extends Service {
     private Surface mSurfacePortrait;
     private Surface mSurfaceLandscape;
     private String mVideoEncoderCodecName;
+    private String mAudioEncoderCodecName;
     private String mVideoMime;
+    private String mAudioMime;
     private MediaCodec mVideoEncoderMediaCodecPortrait;
     private MediaCodec mVideoEncoderMediaCodecLandscape;
     private MediaFormat mVideoEncoderMediaFormatPortrait;
@@ -428,13 +432,6 @@ public class MediaClientService extends Service {
         }
         boolean ret = Boolean.parseBoolean(str);
         if (!ret) {
-            /*mUiHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    Toast.makeText(
-                            mContext, "没有连接上服务端", Toast.LENGTH_SHORT).show();
-                }
-            });*/
             releaseAll();
             return false;
         }
@@ -443,10 +440,25 @@ public class MediaClientService extends Service {
         mSurfaceLandscape = (Surface) jniObject.valueObjectArray[1];
         jniObject = null;
 
+        jniObject = JniObject.obtain();
+        jniObject.valueIntArray = new int[]{
+                MediaUtils.sampleRateInHz,
+                MediaUtils.channelCount,
+                MediaUtils.channelConfig,
+                MediaUtils.getMinBufferSize() * 4};
+        mAudioMime = MediaFormat.MIMETYPE_AUDIO_AAC;
+        mAudioEncoderCodecName = MyJni.getEncoderCodecName(mAudioMime);
+        Log.i(TAG,
+                "startScreenRecordForNative() mAudioEncoderCodecName: " + mAudioEncoderCodecName);
+        jniObject.valueStringArray = new String[]{mAudioMime, mAudioEncoderCodecName};
+        mMyJni.onTransact(
+                MyJni.DO_SOMETHING_CODE_start_audio_record_prepare, jniObject);
+
         mMediaProjection.registerCallback(mMediaProjectionCallback,
                 EventBusUtils.getThreadHandler());
 
         mMyJni.onTransact(DO_SOMETHING_CODE_start_screen_record, null);
+        mMyJni.onTransact(DO_SOMETHING_CODE_start_audio_record, null);
         Log.i(TAG, "startScreenRecordForNative() end");
         return true;
     }

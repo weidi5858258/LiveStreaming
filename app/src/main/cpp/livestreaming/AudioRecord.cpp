@@ -31,6 +31,8 @@ AudioRecord::AudioRecord() :
     LOGI("AudioRecord::AudioRecord()");
     recordBuffers[0] = new short[recordBufferSize];
     recordBuffers[1] = new short[recordBufferSize];
+    buffer = (unsigned char *) malloc(4096);
+    bufferSize = 4096;
 }
 
 AudioRecord::~AudioRecord() {
@@ -43,6 +45,11 @@ AudioRecord::~AudioRecord() {
     if (recordBuffers[1]) {
         delete recordBuffers[1];
         recordBuffers[1] = NULL;
+    }
+
+    if (buffer) {
+        free(buffer);
+        buffer = nullptr;
     }
 
     // destroy audio recorder object, and invalidate all associated interfaces
@@ -60,7 +67,7 @@ AudioRecord::~AudioRecord() {
         engineEngine = NULL;
     }
 
-    pthread_mutex_destroy(&audioEngineLock);
+    //pthread_mutex_destroy(&audioEngineLock);
 }
 
 void AudioRecord::createEngine() {
@@ -148,6 +155,7 @@ void AudioRecord::createAudioRecorder() {
 }
 
 void AudioRecord::startRecording() {
+    LOGI("AudioRecord::startRecording() start\n");
     _isDoing = true;
     SLresult result;
 
@@ -167,10 +175,7 @@ void AudioRecord::startRecording() {
 
     // enqueue an empty buffer to be filled by the recorder
     // (for streaming recording, we would enqueue at least 2 empty buffers to start things off)
-    result = (*recorderBufferQueue)->Enqueue(
-            recorderBufferQueue,
-            recordBuffers[index],
-            recordBufferSize * sizeof(short));
+    result = (*recorderBufferQueue)->Enqueue(recorderBufferQueue, buffer, bufferSize);
     // the most likely other result is SL_RESULT_BUFFER_INSUFFICIENT,
     // which for this code example would indicate a programming error
     assert(SL_RESULT_SUCCESS == result);
@@ -180,7 +185,10 @@ void AudioRecord::startRecording() {
     result = (*recorderRecord)->SetRecordState(recorderRecord, SL_RECORDSTATE_RECORDING);
     assert(SL_RESULT_SUCCESS == result);
     (void) result;
+    LOGI("AudioRecord::startRecording() end\n");
 }
+
+static uint64_t count = 0;
 
 // this callback handler is called every time a buffer finishes recording
 void AudioRecord::bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
@@ -194,25 +202,29 @@ void AudioRecord::bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *con
     // but instead, this is a one-time buffer so we stop recording
     SLresult result;
     if (audioRecord->_isDoing) {
-        int tempIndex = audioRecord->index;
-        unsigned int tempRecordBufferSize = audioRecord->recordBufferSize;
+        /*int tempIndex = audioRecord->index;
+        unsigned int tempRecordBufferSize = audioRecord->recordBufferSize;*/
+
+        // 处理PCM数据(进行编码)
+        if (audioRecord->buffer != nullptr && audioRecord->bufferSize > 0) {
+            if (audioRecord->mediaCodec != NULL) {
+                /*LOGI("AudioRecord::bqRecorderCallback() tempRecordBufferSize: %lld\n",
+                     audioRecord->recordBufferSize);*/
+                audioRecord->mediaCodec->feedInputBufferAndDrainOutputBuffer(
+                        audioRecord->mediaCodec->getMediaCodec(),
+                        audioRecord->buffer,
+                        0,
+                        audioRecord->bufferSize,
+                        (++count),//
+                        0,
+                        true, false, true);
+            }
+        }
 
         audioRecord->index = 1 - audioRecord->index;
         (*audioRecord->recorderBufferQueue)->Enqueue(audioRecord->recorderBufferQueue,
-                                                     audioRecord->recordBuffers[audioRecord->index],
-                                                     audioRecord->recordBufferSize * sizeof(short));
-
-        // 处理PCM数据(进行编码)
-        if (audioRecord->mediaCodec != NULL) {
-            audioRecord->mediaCodec->feedInputBufferAndDrainOutputBuffer(
-                    audioRecord->mediaCodec->getMediaCodec(),
-                    (unsigned char *) audioRecord->recordBuffers[tempIndex],
-                    0,
-                    tempRecordBufferSize,
-                    0,//
-                    0,
-                    true, false, true);
-        }
+                                                     audioRecord->buffer,
+                                                     audioRecord->bufferSize);
     } else {
         result = (*audioRecord->recorderRecord)->SetRecordState(
                 audioRecord->recorderRecord, SL_RECORDSTATE_STOPPED);

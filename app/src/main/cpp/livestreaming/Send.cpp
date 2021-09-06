@@ -44,7 +44,7 @@ void Send::gameOver() {
 void Send::putH264(RTMPPacket *packet) {
     pthread_mutex_lock(&h264_mutex);
     h264_list.push_back(packet);
-    LOGI("Send::putH264()  size: %lld", h264_list.size());
+    //LOGI("Send::putH264()  size: %lld", h264_list.size());
     pthread_cond_signal(&h264_cond);
     pthread_mutex_unlock(&h264_mutex);
 }
@@ -80,7 +80,7 @@ void *Send::sendH264(void *arg) {
         }
         packet = send->h264_list.front();
         send->h264_list.pop_front();
-        LOGD("Send::sendH264() size: %lld", send->h264_list.size());
+        //LOGD("Send::sendH264() size: %lld", send->h264_list.size());
         pthread_mutex_unlock(&send->h264_mutex);
 
         // send

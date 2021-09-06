@@ -240,6 +240,7 @@ bool MediaCodec::feedInputBuffer(AMediaCodec *codec,
                                  unsigned char *data, off_t offset, size_t size,
                                  uint64_t time, uint32_t flags) {
     ssize_t roomIndex = AMediaCodec_dequeueInputBuffer(codec, TIME_OUT);
+    LOGI("MediaCodec::feedInputBuffer() roomIndex: %d", roomIndex);
     if (roomIndex < 0) {
         return true;
     }
@@ -248,6 +249,7 @@ bool MediaCodec::feedInputBuffer(AMediaCodec *codec,
     //auto room = AMediaCodec_getInputBuffer(codec, roomIndex, &out_size);
     uint8_t *room = AMediaCodec_getInputBuffer(codec, (size_t) roomIndex, &out_size);
     if (room == nullptr) {
+        LOGE("MediaCodec::feedInputBuffer() room is nullptr");
         return false;
     }
     memcpy(room, data, size);
@@ -264,6 +266,7 @@ bool MediaCodec::drainOutputBuffer(AMediaCodec *codec, bool release, bool render
         }
 
         ssize_t roomIndex = AMediaCodec_dequeueOutputBuffer(codec, &info, TIME_OUT);
+        LOGI("MediaCodec::drainOutputBuffer() roomIndex: %d", roomIndex);
         if (roomIndex < 0) {
             switch (roomIndex) {
                 case AMEDIACODEC_INFO_TRY_AGAIN_LATER: {
@@ -476,6 +479,7 @@ void MediaCodec::screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data
 }
 
 void MediaCodec::audioRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {
+    LOGI("MediaCodec::audioRecordCallback()\n");
     // data就是音频采集后编码成aac的数据
     // 然后进行封装
     // 最后进行发送
