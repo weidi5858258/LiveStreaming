@@ -23,6 +23,11 @@
 
 #define LOG "player_alexander"
 
+
+#define STREAM_CHANNEL_METADATA  0x03
+#define STREAM_CHANNEL_VIDEO     0x04
+#define STREAM_CHANNEL_AUDIO     0x05
+
 static int TIME_OUT = 10000;
 
 static int64_t currentTimeMillis() {
@@ -155,9 +160,9 @@ void MediaCodec::startScreenRecord() {
     LOGI("MediaCodec::startScreenRecord() start\n");
     _isDoing = true;
     createPortraitVirtualDisplay();
-    if (_sps_pps == nullptr) {
+    /*if (_sps_pps == nullptr) {
         getSpsPps();
-    }
+    }*/
     // 开启线程不断地读取数据
     pthread_t p_tids_receive_data;
     pthread_attr_t attr;// 定义一个属性
@@ -453,7 +458,40 @@ MediaCodec::MARK MediaCodec::handleSpsPps(AMediaFormat *pFormat, uint8_t *sps_pp
     return mark;
 }
 
-MediaCodec::MARK MediaCodec::handleSpsPps(uint8_t *sps_pps, AMediaCodecBufferInfo &info) {
+void MediaCodec::screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {
+    // data就是录制屏幕后编码成h264的数据
+    // 然后进行封装
+    // 最后进行发送
+    switch (info.flags) {
+        case 2: {
+            handleVideoSpsPps(info, data);
+            break;
+        }
+        case 1:
+        default:
+            handleVideo(info, data);
+            break;
+    }
+
+}
+
+void MediaCodec::audioRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {
+    // data就是音频采集后编码成aac的数据
+    // 然后进行封装
+    // 最后进行发送
+    switch (info.flags) {
+        case 2: {
+            handleAudioSpsPps(info, data);
+            break;
+        }
+        case 1:
+        default:
+            handleAudio(info, data);
+            break;
+    }
+}
+
+MediaCodec::MARK MediaCodec::handleVideoSpsPps(AMediaCodecBufferInfo &info, uint8_t *sps_pps) {
     int32_t size = info.size;
     MARK mark = MARK0;
     int index = -1;
@@ -627,12 +665,12 @@ MediaCodec::MARK MediaCodec::handleSpsPps(uint8_t *sps_pps, AMediaCodecBufferInf
         packet->m_body[15 + _sps_length] = _pps_length & 0xFF;
         // 拷贝PPS数据
         memcpy(&packet->m_body[16 + _sps_length], _pps, _pps_length);
-        packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
-        packet->m_nBodySize = body_size;
-        packet->m_nChannel = 0x04;
-        packet->m_nTimeStamp = info.presentationTimeUs / 1000;//
-        packet->m_hasAbsTimestamp = 0;
         packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
+        packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
+        packet->m_nChannel = STREAM_CHANNEL_VIDEO;
+        packet->m_nBodySize = body_size;
+        packet->m_nTimeStamp = 0;//info.presentationTimeUs / 1000
+        packet->m_hasAbsTimestamp = 0;
         packet->m_nInfoField2 = _rtmp->m_stream_id;
 
         _send->putH264(packet);
@@ -644,35 +682,33 @@ MediaCodec::MARK MediaCodec::handleSpsPps(uint8_t *sps_pps, AMediaCodecBufferInf
     return mark;
 }
 
-void MediaCodec::getSpsPps() {
-    bool isGettingSpsPps = true;
-    AMediaCodecBufferInfo roomInfo;
-    size_t out_size = 0;
-    LOGI("MediaCodec::getSpsPps() start\n");
-    while (isGettingSpsPps) {
-        for (;;) {
-            ssize_t roomIndex = AMediaCodec_dequeueOutputBuffer(_codec, &roomInfo, TIME_OUT);
-            if (roomIndex < 0) {
-                break;
-            }
-            uint8_t *room = AMediaCodec_getOutputBuffer(_codec, (size_t) roomIndex, &out_size);
-            if (room != nullptr && (roomInfo.flags & 2)) {// 配置帧
-                isGettingSpsPps = false;
-                _mark = handleSpsPps(room, roomInfo);
-                LOGI("MediaCodec::getSpsPps() _mark: %d\n", _mark);
-                AMediaCodec_releaseOutputBuffer(_codec, roomIndex, false);
-                break;
-            }
-            AMediaCodec_releaseOutputBuffer(_codec, roomIndex, false);
-        }
-    }
-    LOGI("MediaCodec::getSpsPps() end\n");
+MediaCodec::MARK MediaCodec::handleAudioSpsPps(AMediaCodecBufferInfo &info, uint8_t *sps_pps) {
+    // https://blog.csdn.net/jenie/article/details/106953850
+    int32_t size = info.size;
+    MARK mark = MARK0;
+
+    RTMPPacket *packet = nullptr;
+    packet = (RTMPPacket *) malloc(sizeof(RTMPPacket));
+    RTMPPacket_Alloc(packet, 4);
+    RTMPPacket_Reset(packet);
+
+    packet->m_body[0] = 0xAF;//MP3 AAC format 48000Hz
+    packet->m_body[1] = 0x00;
+    packet->m_body[2] = 0x11;
+    packet->m_body[3] = 0x90;//0x10修改为0x90,2016-1-19
+
+    packet->m_headerType = RTMP_PACKET_SIZE_MEDIUM;
+    packet->m_packetType = RTMP_PACKET_TYPE_AUDIO;
+    packet->m_nChannel = STREAM_CHANNEL_AUDIO;
+    packet->m_nBodySize = 4;
+    packet->m_nTimeStamp = 0;
+    packet->m_hasAbsTimestamp = 0;
+    packet->m_nInfoField2 = _rtmp->m_stream_id;
+
+    _send->putAac(packet);
 }
 
-void MediaCodec::screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {
-    // data就是录制屏幕后编码成h264的数据
-    // 然后进行封装
-    // 最后进行发送
+void MediaCodec::handleVideo(AMediaCodecBufferInfo &info, uint8_t *data) {
     RTMPPacket *packet = nullptr;
     int32_t size = info.size;
     int body_size = 9 + size;
@@ -691,6 +727,7 @@ void MediaCodec::screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data
     packet->m_body[2] = 0x00;
     packet->m_body[3] = 0x00;
     packet->m_body[4] = 0x00;
+    // 4个字节用来表示数据长度
     packet->m_body[5] = (size >> 24) & 0xFF;
     packet->m_body[6] = (size >> 16) & 0xFF;
     packet->m_body[7] = (size >> 8) & 0xFF;
@@ -698,7 +735,7 @@ void MediaCodec::screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data
     memcpy(&packet->m_body[9], data, size);
     packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
     packet->m_nBodySize = body_size;
-    packet->m_nChannel = 0x04;
+    packet->m_nChannel = STREAM_CHANNEL_VIDEO;
     packet->m_nTimeStamp = info.presentationTimeUs / 1000;//
     packet->m_hasAbsTimestamp = 0;
     packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
@@ -707,10 +744,28 @@ void MediaCodec::screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data
     _send->putH264(packet);
 }
 
-void MediaCodec::audioRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {
-    // data就是音频采集后编码成aac的数据
-    // 然后进行封装
-    // 最后进行发送
+void MediaCodec::handleAudio(AMediaCodecBufferInfo &info, uint8_t *data) {
+    RTMPPacket *packet = nullptr;
+    int32_t size = info.size;
+    int body_size = 2 + size;
+    packet = (RTMPPacket *) malloc(sizeof(RTMPPacket));
+    RTMPPacket_Alloc(packet, body_size);
+    RTMPPacket_Reset(packet);
+
+    // MP3 AAC format 48000Hz
+    packet->m_body[0] = 0xAF;
+    packet->m_body[1] = 0x01;
+    memcpy(&packet->m_body[2], data, size);
+
+    packet->m_headerType = RTMP_PACKET_SIZE_MEDIUM;
+    packet->m_packetType = RTMP_PACKET_TYPE_AUDIO;
+    packet->m_nChannel = STREAM_CHANNEL_AUDIO;
+    packet->m_nBodySize = body_size;
+    packet->m_nTimeStamp = info.presentationTimeUs / 1000;
+    packet->m_hasAbsTimestamp = 0;
+    packet->m_nInfoField2 = _rtmp->m_stream_id;
+
+    _send->putAac(packet);
 }
 
 

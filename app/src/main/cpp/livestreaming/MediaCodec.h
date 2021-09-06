@@ -106,11 +106,7 @@ public:
     }
 
 private:
-    MARK handleSpsPps(uint8_t *sps_pps, AMediaCodecBufferInfo &info);
-
     MARK handleSpsPps(AMediaFormat *pFormat, uint8_t *sps_pps, ssize_t size);
-
-    void getSpsPps();
 
     bool feedInputBuffer(AMediaCodec *codec,
                          unsigned char *data, off_t offset, size_t size,
@@ -125,6 +121,14 @@ private:
     void screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data);
 
     void audioRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data);
+
+    MARK handleVideoSpsPps(AMediaCodecBufferInfo &info, uint8_t *sps_pps);
+
+    MARK handleAudioSpsPps(AMediaCodecBufferInfo &info, uint8_t *sps_pps);
+
+    void handleVideo(AMediaCodecBufferInfo &info, uint8_t *data);
+
+    void handleAudio(AMediaCodecBufferInfo &info, uint8_t *data);
 };
 
 #endif //MIRRORCAST_MEDIACODEC_H

@@ -267,7 +267,7 @@ static jint onTransact_init_rtmp(JNIEnv *env, jobject myJniObject, jint code, jo
         rtmp = RTMP_Alloc();
         RTMP_Init(rtmp);
         rtmp->Link.timeout = 10;
-        if (!RTMP_SetupURL(rtmp, "rtmp://192.168.43.182/live/stream")) {
+        if (!RTMP_SetupURL(rtmp, "rtmp://192.168.0.108:1935/live")) {
             LOGE("onTransact_init_rtmp() RTMP_SetupURL");
             onTransact_release(env, myJniObject, code, jniObject);
             return JNI_ERR;
