@@ -8,6 +8,7 @@ import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
+import android.media.AudioRecord;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.media.projection.MediaProjection;
@@ -200,6 +201,11 @@ public class MediaClientService extends Service {
 
     private boolean mIsKeyFrameWritePortrait = false;
     private boolean mIsKeyFrameWriteLandscape = false;
+
+    private AudioRecord audioRecord;
+    private byte[] audioData;
+    private int sizeInBytes;
+    private JniObject audioJniObject = JniObject.obtain();
 
     private Object onEvent(int what, Object[] objArray) {
         Object result = null;
@@ -445,7 +451,7 @@ public class MediaClientService extends Service {
                 MediaUtils.sampleRateInHz,
                 MediaUtils.channelCount,
                 MediaUtils.channelConfig,
-                MediaUtils.getMinBufferSize() * 4};
+                MediaUtils.getMinBufferSize()};
         mAudioMime = MediaFormat.MIMETYPE_AUDIO_AAC;
         mAudioEncoderCodecName = MyJni.getEncoderCodecName(mAudioMime);
         Log.i(TAG,
@@ -454,11 +460,32 @@ public class MediaClientService extends Service {
         mMyJni.onTransact(
                 MyJni.DO_SOMETHING_CODE_start_audio_record_prepare, jniObject);
 
+        // Test
+        audioRecord = MediaUtils.createAudioRecord();
+        audioRecord.startRecording();
+        sizeInBytes = MediaUtils.getMinBufferSize();
+        audioData = new byte[sizeInBytes];
+
         mMediaProjection.registerCallback(mMediaProjectionCallback,
                 EventBusUtils.getThreadHandler());
 
         mMyJni.onTransact(DO_SOMETHING_CODE_start_screen_record, null);
-        mMyJni.onTransact(DO_SOMETHING_CODE_start_audio_record, null);
+        //mMyJni.onTransact(DO_SOMETHING_CODE_start_audio_record, null);
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                for (; ; ) {
+                    int size = audioRecord.read(audioData, 0, sizeInBytes);
+                    Log.i(TAG, "startScreenRecordForNative() size: " + size);
+                    audioJniObject.valueByteArray = audioData;
+                    audioJniObject.valueInt = size;
+                    audioJniObject.valueLong = System.currentTimeMillis() * 1000;
+                    mMyJni.onTransact(DO_SOMETHING_CODE_start_audio_record, audioJniObject);
+                }
+            }
+        }).start();
+
         Log.i(TAG, "startScreenRecordForNative() end");
         return true;
     }

@@ -267,9 +267,9 @@ static jint onTransact_init_rtmp(JNIEnv *env, jobject myJniObject, jint code, jo
         rtmp = RTMP_Alloc();
         RTMP_Init(rtmp);
         rtmp->Link.timeout = 10;
-        //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.0.108:1935/live")) {
-        if (!RTMP_SetupURL(rtmp, "rtmp://192.168.43.182/live/stream")) {
-        //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.1.104/live/stream")) {
+        if (!RTMP_SetupURL(rtmp, "rtmp://192.168.0.108:1935/live")) {
+            //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.43.182/live/stream")) {
+            //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.1.104/live/stream")) {
             LOGE("onTransact_init_rtmp() RTMP_SetupURL");
             onTransact_release(env, myJniObject, code, jniObject);
             return JNI_ERR;
@@ -434,9 +434,25 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
             return env->NewStringUTF("false");
         }
         case DO_SOMETHING_CODE_start_audio_record: {
-            audioRecord->createEngine();
-            audioRecord->createAudioRecorder();
-            audioRecord->startRecording();
+//            audioRecord->createEngine();
+//            audioRecord->createAudioRecorder();
+//            audioRecord->startRecording();
+
+            jobject byteArrayObject = env->GetObjectField(jniObject, valueByteArray_jfieldID);
+            jbyte *byteArray = reinterpret_cast<jbyte *>(
+                    env->GetByteArrayElements(
+                            static_cast<jbyteArray>(byteArrayObject), nullptr));
+            jint size = env->GetIntField(jniObject, valueInt_jfieldID);
+            jlong time = env->GetLongField(jniObject, valueLong_jfieldID);
+            audioRecordMediaCodec->feedInputBufferAndDrainOutputBuffer(
+                    audioRecordMediaCodec->getMediaCodec(),
+                    reinterpret_cast<unsigned char *>(byteArray),
+                    0,
+                    size,
+                    time,
+                    0,
+                    true, false, true);
+            env->DeleteLocalRef(byteArrayObject);
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_stop_audio_record: {

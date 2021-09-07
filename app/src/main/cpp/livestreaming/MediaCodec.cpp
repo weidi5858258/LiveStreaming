@@ -151,6 +151,38 @@ void MediaCodec::startScreenRecordEncoderMediaCodec(
     AMediaCodec_start(_codec);
 }
 
+void MediaCodec::startAudioRecordEncoderMediaCodec(
+        const char *mime, const char *codec_name,
+        int sampleRate, int channelCount, int channelConfig, int maxInputSize) {
+    if (mime == nullptr || codec_name == nullptr) {
+        return;
+    }
+
+    LOGI("MediaCodec::startAudioRecordEncoderMediaCodec()"
+         " mime: %s codec_name: %s\n", mime, codec_name);
+    LOGI("MediaCodec::startAudioRecordEncoderMediaCodec()"
+         " sampleRate: %d channelCount: %d channelConfig: %d maxInputSize: %d\n",
+         sampleRate, channelCount, channelConfig, maxInputSize);
+
+    _isVideo = false;
+    AMediaFormat *pFormat = AMediaFormat_new();
+    AMediaFormat_setString(pFormat, AMEDIAFORMAT_KEY_MIME, mime);
+    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_SAMPLE_RATE, sampleRate);
+    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_CHANNEL_COUNT, channelCount);
+    // 2为MediaCodecInfo.CodecProfileLevel.AACObjectLC
+    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_AAC_PROFILE, 2);
+    // 2为AudioFormat.ENCODING_PCM_16BIT
+    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_BIT_RATE, sampleRate * channelCount * 2);
+    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_CHANNEL_MASK, channelConfig);
+    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, maxInputSize);
+    _format = pFormat;
+
+    _codec = AMediaCodec_createCodecByName(codec_name);
+    AMediaCodec_configure(_codec, _format, nullptr, nullptr, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
+
+    AMediaCodec_start(_codec);
+}
+
 void MediaCodec::startScreenRecord() {
     if (_isDoing) {
         LOGE("MediaCodec::startScreenRecord() return for _isDoing is true\n");
@@ -174,32 +206,6 @@ void MediaCodec::startScreenRecord() {
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_create(&p_tids_receive_data, &attr, startScreenRecordEncoder, this);
     LOGI("MediaCodec::startScreenRecord() end\n");
-}
-
-void MediaCodec::startAudioRecordEncoderMediaCodec(
-        const char *mime, const char *codec_name,
-        int sampleRate, int channelCount, int channelConfig, int maxInputSize) {
-    if (mime == nullptr || codec_name == nullptr) {
-        return;
-    }
-
-    _isVideo = false;
-    AMediaFormat *pFormat = AMediaFormat_new();
-    AMediaFormat_setString(pFormat, AMEDIAFORMAT_KEY_MIME, mime);
-    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_SAMPLE_RATE, sampleRate);
-    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_CHANNEL_COUNT, channelCount);
-    // 2为MediaCodecInfo.CodecProfileLevel.AACObjectLC
-    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_AAC_PROFILE, 2);
-    // 2为AudioFormat.ENCODING_PCM_16BIT
-    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_BIT_RATE, sampleRate * channelCount * 2);
-    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_CHANNEL_MASK, channelConfig);
-    AMediaFormat_setInt32(pFormat, AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, maxInputSize);
-    _format = pFormat;
-
-    _codec = AMediaCodec_createCodecByName(codec_name);
-    AMediaCodec_configure(_codec, _format, nullptr, nullptr, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
-
-    AMediaCodec_start(_codec);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////

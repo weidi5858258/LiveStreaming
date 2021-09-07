@@ -161,13 +161,15 @@ public class MyJni {
             if (TextUtils.isEmpty(codecName)) {
                 continue;
             }
-            String tempCodecName = codecName.toLowerCase();
-            if (tempCodecName.startsWith("omx.google.")
-                    || tempCodecName.startsWith("c2.android.")
-                    || tempCodecName.endsWith(".secure")// 用于加密的视频
-                    || (!tempCodecName.startsWith("omx.") && !tempCodecName.startsWith("c2."))) {
-                codecName = null;
-                continue;
+            if (mime.startsWith("video/")) {
+                String tempCodecName = codecName.toLowerCase();
+                if (tempCodecName.startsWith("omx.google.")
+                        || tempCodecName.startsWith("c2.android.")
+                        || tempCodecName.endsWith(".secure")// 用于加密的视频
+                        || (!tempCodecName.startsWith("omx.") && !tempCodecName.startsWith("c2."))) {
+                    codecName = null;
+                    continue;
+                }
             }
             break;
 
@@ -195,11 +197,11 @@ public class MyJni {
             if (TextUtils.isEmpty(codecName)) {
                 continue;
             }
-            String tempCodecName = codecName.toLowerCase();
             // 硬解
             // OMX.qcom.video.encoder.avc
             // OMX.google.aac.encoder
             if (mime.startsWith("video/")) {
+                String tempCodecName = codecName.toLowerCase();
                 if (tempCodecName.startsWith("omx.google.")
                         || tempCodecName.startsWith("c2.android.")
                         // 用于加密的视频
