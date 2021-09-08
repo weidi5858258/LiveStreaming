@@ -1,17 +1,23 @@
 package com.weidi.livestreaming;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
+import android.graphics.BitmapFactory;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
 import android.media.AudioRecord;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
 import android.media.projection.MediaProjection;
+import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.provider.MediaStore;
@@ -113,6 +119,9 @@ public class MediaClientService extends Service {
         layoutParams.y = 0;
         mWindowManager.addView(mView, layoutParams);
 
+        mMediaProjectionManager =
+                (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+
         myOrientationListener = new OrientationListener(this);
         boolean autoRotateOn = Settings.System.getInt(getContentResolver(),
                 Settings.System.ACCELEROMETER_ROTATION, 0) == 1;
@@ -130,7 +139,18 @@ public class MediaClientService extends Service {
     }
 
     private void internalOnStartCommand(Intent intent, int flags, int startId) {
-
+        if (intent == null) {
+            return;
+        }
+        String action = intent.getStringExtra("action");
+        if (TextUtils.equals(action, "GetMediaProjection")) {
+            createNotificationChannel();
+            int resultCode = intent.getIntExtra("code", -1);
+            Intent data = intent.getParcelableExtra("data");
+            mMediaProjection = mMediaProjectionManager.getMediaProjection(resultCode, data);
+            EventBusUtils.postThread(
+                    MediaClientService.class.getName(), START_SCREEN_RECORD, null);
+        }
     }
 
     private void internalOnDestroy() {
@@ -172,6 +192,7 @@ public class MediaClientService extends Service {
     private final Condition conditionPortrait = lockPortrait.newCondition();
     private final Lock lockLandscape = new ReentrantLock();
     private final Condition conditionLandscape = lockLandscape.newCondition();
+    private MediaProjectionManager mMediaProjectionManager;
     private MediaProjection mMediaProjection;
     private VirtualDisplay mVirtualDisplay;
     private int whatIsDevice = 1;
@@ -508,7 +529,7 @@ public class MediaClientService extends Service {
     private synchronized void stopScreenRecordForNative() {
         Log.i(TAG, "stopScreenRecordForNative() start");
         mMyJni.onTransact(DO_SOMETHING_CODE_stop_screen_record, null);
-        //releaseAll();
+        releaseAll();
         EventBusUtils.postUi(MainActivity.class.getName(), MAINACTIVITY_ON_RESUME, null);
         Log.i(TAG, "stopScreenRecordForNative() end");
     }
@@ -599,6 +620,38 @@ public class MediaClientService extends Service {
         frame[1] = (byte) (length >> 8);
         frame[2] = (byte) (length >> 16);
         frame[3] = (byte) (length >> 24);
+    }
+
+    private void createNotificationChannel() {
+        //获取一个Notification构造器
+        Notification.Builder builder = new Notification.Builder(this.getApplicationContext());
+        //点击后跳转的界面，可以设置跳转数据
+        Intent intent = new Intent(this, MainActivity.class);
+
+        // 设置PendingIntent
+        builder.setContentIntent(PendingIntent.getActivity(this, 0, intent, 0))
+                // 设置下拉列表中的图标(大图标)
+                .setLargeIcon(BitmapFactory.decodeResource(this.getResources(), R.mipmap.ic_launcher))
+                .setContentTitle("A")// 设置下拉列表里的标题
+                .setSmallIcon(R.mipmap.ic_launcher)// 设置状态栏内的小图标
+                .setContentText("B")// 设置上下文内容
+                .setWhen(System.currentTimeMillis());// 设置该通知发生的时间
+
+        /*以下是对Android 8.0的适配*/
+        // 普通notification适配
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder.setChannelId("notification_id");
+            // 前台服务notification适配
+            NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            NotificationChannel channel = new NotificationChannel("notification_id", "notification_name", NotificationManager.IMPORTANCE_LOW);
+            notificationManager.createNotificationChannel(channel);
+        }
+
+        // 获取构建好的Notification
+        Notification notification = builder.build();
+        // 设置为默认的声音
+        notification.defaults = Notification.DEFAULT_SOUND;
+        startForeground(110, notification);
     }
 
     private class OrientationListener extends OrientationEventListener {

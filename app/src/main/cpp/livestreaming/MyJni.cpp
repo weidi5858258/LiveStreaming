@@ -210,12 +210,12 @@ jint onTransact_release(JNIEnv *env, jobject myJniObject, jint code, jobject jni
         LOGI("onTransact_release() delete audioRecordMediaCodec");
         delete audioRecordMediaCodec;
         audioRecordMediaCodec = nullptr;
-    // 2
-    if (send) {
-        LOGI("onTransact_release() delete send");
-        delete send;
-        send = nullptr;
-    }
+        // 2
+        if (send) {
+            LOGI("onTransact_release() delete send");
+            delete send;
+            send = nullptr;
+        }
     }
     // 1
     if (audioRecord) {
@@ -296,9 +296,9 @@ static jint onTransact_init_rtmp(JNIEnv *env, jobject myJniObject, jint code, jo
         rtmp = RTMP_Alloc();
         RTMP_Init(rtmp);
         rtmp->Link.timeout = 10;
-        if (!RTMP_SetupURL(rtmp, "rtmp://192.168.0.108:1935/live")) {
-            //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.43.182/live/stream")) {
-            //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.1.104/live/stream")) {
+        //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.0.108:1935/live")) {
+        //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.43.182/live/stream")) {
+        if (!RTMP_SetupURL(rtmp, "rtmp://192.168.1.104/live/stream")) {
             LOGE("onTransact_init_rtmp() RTMP_SetupURL");
             release_count = 10;
             onTransact_release(env, myJniObject, code, jniObject);

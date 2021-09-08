@@ -154,7 +154,7 @@ public class MainActivity extends AppCompatActivity {
                         Uri.parse("package:" + getPackageName()));
                 startActivityForResult(intent, 0);
             } else {
-                startService(new Intent(this, MediaClientService.class));
+                //startService(new Intent(this, MediaClientService.class));
             }
         }
     }
@@ -191,6 +191,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void internalOnDestroy() {
+        EventBusUtils.postThread(
+                MediaClientService.class.getName(), SET_ACTIVITY, null);
         EventBusUtils.unregister(this);
     }
 
@@ -201,7 +203,7 @@ public class MainActivity extends AppCompatActivity {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     if (Settings.canDrawOverlays(this)) {
                         Log.i(TAG, "internalonActivityResult() 浮动窗口的权限已申请!!!");
-                        startService(new Intent(this, MediaClientService.class));
+                        //startService(new Intent(this, MediaClientService.class));
                     } else {
                         Log.e(TAG, "internalonActivityResult() 浮动窗口的权限已拒绝!!!");
                     }
@@ -214,9 +216,18 @@ public class MainActivity extends AppCompatActivity {
             case CREATE_SCREEN_CAPTURE_INTENT: {
                 // requestCode: 1000 resultCode: -1 data: Intent { (has extras) }
                 // MediaProjection对象是这样来的,所以要得到MediaProjection对象,必须同意权限
-                if (mMediaProjectionManager != null) {
-                    mMediaProjection =
-                            mMediaProjectionManager.getMediaProjection(resultCode, data);
+                EventBusUtils.postThread(
+                        MediaClientService.class.getName(), SET_ACTIVITY,
+                        new Object[]{MainActivity.this});
+
+                Intent service = new Intent(this, MediaClientService.class);
+                service.putExtra("action", "GetMediaProjection");
+                service.putExtra("code", resultCode);
+                service.putExtra("data", data);
+                startForegroundService(service);
+
+                /*if (mMediaProjectionManager != null) {
+                    mMediaProjection = mMediaProjectionManager.getMediaProjection(resultCode, data);
                 }
                 if (mMediaProjection == null) {
                     Log.e(TAG, "internalonActivityResult() mMediaProjection is null");
@@ -236,7 +247,7 @@ public class MainActivity extends AppCompatActivity {
                         MediaClientService.class.getName(), SET_MEDIAPROJECTION,
                         new Object[]{mMediaProjection});
                 EventBusUtils.postThread(
-                        MediaClientService.class.getName(), START_SCREEN_RECORD, null);
+                        MediaClientService.class.getName(), START_SCREEN_RECORD, null);*/
                 break;
             }
             default:
