@@ -138,13 +138,15 @@ void AudioRecord::createAudioRecorder() {
     }
 
     // realize the audio recorder 实例化这个录制对象
-    result = (*recorderObject)->Realize(recorderObject, SL_BOOLEAN_FALSE);
+    result = (*recorderObject)->Realize(
+            recorderObject, SL_BOOLEAN_FALSE);
     if (SL_RESULT_SUCCESS != result) {
         return;
     }
 
     // get the record interface 获取录制接口
-    result = (*recorderObject)->GetInterface(recorderObject, SL_IID_RECORD, &recorderRecord);
+    result = (*recorderObject)->GetInterface(
+            recorderObject, SL_IID_RECORD, &recorderRecord);
     assert(SL_RESULT_SUCCESS == result);
     (void) result;
 

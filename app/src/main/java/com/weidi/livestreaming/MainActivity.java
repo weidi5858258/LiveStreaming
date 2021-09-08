@@ -154,7 +154,7 @@ public class MainActivity extends AppCompatActivity {
                         Uri.parse("package:" + getPackageName()));
                 startActivityForResult(intent, 0);
             } else {
-                //startService(new Intent(this, MediaClientService.class));
+                startService(new Intent(this, MediaClientService.class));
             }
         }
     }
@@ -187,12 +187,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void internalOnStop() {
-
+        EventBusUtils.postThread(
+                MediaClientService.class.getName(), SET_ACTIVITY, null);
     }
 
     private void internalOnDestroy() {
-        EventBusUtils.postThread(
-                MediaClientService.class.getName(), SET_ACTIVITY, null);
         EventBusUtils.unregister(this);
     }
 
@@ -203,14 +202,11 @@ public class MainActivity extends AppCompatActivity {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     if (Settings.canDrawOverlays(this)) {
                         Log.i(TAG, "internalonActivityResult() 浮动窗口的权限已申请!!!");
-                        //startService(new Intent(this, MediaClientService.class));
+                        startService(new Intent(this, MediaClientService.class));
                     } else {
                         Log.e(TAG, "internalonActivityResult() 浮动窗口的权限已拒绝!!!");
                     }
                 }
-                break;
-            }
-            case 1: {
                 break;
             }
             case CREATE_SCREEN_CAPTURE_INTENT: {
