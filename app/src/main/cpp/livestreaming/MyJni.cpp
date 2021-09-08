@@ -154,45 +154,74 @@ void createPortraitVirtualDisplay() {
     }
 }
 
+void jni2Java(DO_SOMETHING_CODE code) {
+    JNIEnv *jniEnv;
+    bool isAttached = getEnv(&jniEnv);
+    jniEnv->CallVoidMethod(myJniJavaObject, jni2JavaMethodID, code, nullptr);
+    if (isAttached) {
+        gJavaVm->DetachCurrentThread();
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////
 
 static jint onTransact_stop(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject) {
-    send->gameOver();
-    audioRecord->gameOver();
-    screenRecordMediaCodec->gameOver();
-    audioRecordMediaCodec->gameOver();
+    if (audioRecord) {
+        audioRecord->gameOver();
+    }
+    if (send) {
+        send->gameOver();
+    }
+    if (screenRecordMediaCodec) {
+        screenRecordMediaCodec->gameOver();
+    }
+    if (audioRecordMediaCodec) {
+        audioRecordMediaCodec->gameOver();
+    }
     return JNI_OK;
 }
 
 jint onTransact_release(JNIEnv *env, jobject myJniObject, jint code, jobject jniObject) {
-    LOGI("onTransact_release() start");
     pthread_mutex_lock(&release_mutex);
     release_count++;
-    if (release_count < 2) {//4
-        return JNI_ERR;
+    LOGI("onTransact_release() release_count: %d", release_count);
+    if (release_count < 4) {
+        pthread_mutex_unlock(&release_mutex);
+        return JNI_OK;
     }
+
+    LOGI("onTransact_release() start");
     if (rtmp) {
+        LOGI("onTransact_release() RTMP_Free(rtmp)");
         if (RTMP_IsConnected(rtmp)) {
             RTMP_Close(rtmp);
         }
         RTMP_Free(rtmp);
         rtmp = nullptr;
     }
+    // 1次触发这里
     if (screenRecordMediaCodec) {
+        LOGI("onTransact_release() delete screenRecordMediaCodec");
         delete screenRecordMediaCodec;
         screenRecordMediaCodec = nullptr;
     }
+    // 0
     if (audioRecordMediaCodec) {
+        LOGI("onTransact_release() delete audioRecordMediaCodec");
         delete audioRecordMediaCodec;
         audioRecordMediaCodec = nullptr;
-    }
-    if (audioRecord) {
-        delete audioRecord;
-        audioRecord = nullptr;
-    }
+    // 2
     if (send) {
+        LOGI("onTransact_release() delete send");
         delete send;
         send = nullptr;
+    }
+    }
+    // 1
+    if (audioRecord) {
+        LOGI("onTransact_release() delete audioRecord");
+        delete audioRecord;
+        audioRecord = nullptr;
     }
     release_count = 0;
     pthread_mutex_unlock(&release_mutex);
@@ -271,17 +300,20 @@ static jint onTransact_init_rtmp(JNIEnv *env, jobject myJniObject, jint code, jo
             //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.43.182/live/stream")) {
             //if (!RTMP_SetupURL(rtmp, "rtmp://192.168.1.104/live/stream")) {
             LOGE("onTransact_init_rtmp() RTMP_SetupURL");
+            release_count = 10;
             onTransact_release(env, myJniObject, code, jniObject);
             return JNI_ERR;
         }
         RTMP_EnableWrite(rtmp);
         if (!RTMP_Connect(rtmp, NULL)) {
             LOGE("onTransact_init_rtmp() RTMP_Connect");
+            release_count = 10;
             onTransact_release(env, myJniObject, code, jniObject);
             return JNI_ERR;
         }
         if (!RTMP_ConnectStream(rtmp, 0)) {
             LOGE("onTransact_init_rtmp() RTMP_ConnectStream");
+            release_count = 10;
             onTransact_release(env, myJniObject, code, jniObject);
             return JNI_ERR;
         }
@@ -350,7 +382,9 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
         case DO_SOMETHING_CODE_start_screen_record_prepare: {
             jobject intArrayObject = env->GetObjectField(jniObject, valueIntArray_jfieldID);
             jobject stringArrayObject = env->GetObjectField(jniObject, valueStringArray_jfieldID);
-            if (intArrayObject != nullptr && stringArrayObject != nullptr) {
+            if (intArrayObject != nullptr
+                && stringArrayObject != nullptr
+                && screenRecordMediaCodec) {
                 // int[]
                 jint *intArray = reinterpret_cast<jint *>(
                         env->GetIntArrayElements(static_cast<jintArray>(intArrayObject), nullptr));
@@ -394,19 +428,26 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
             return env->NewStringUTF("false");
         }
         case DO_SOMETHING_CODE_start_screen_record: {
-            //screenRecordMediaCodec->startScreenRecord();
-            //send->startSend();
+            if (screenRecordMediaCodec) {
+                screenRecordMediaCodec->startScreenRecord();
+            }
+            if (send) {
+                send->startSend();
+            }
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_stop_screen_record: {
             onTransact_stop(env, thiz, code, jniObject);
-            onTransact_release(nullptr, nullptr, 0, nullptr);
+            //onTransact_release(nullptr, nullptr, 0, nullptr);
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_start_audio_record_prepare: {
             jobject intArrayObject = env->GetObjectField(jniObject, valueIntArray_jfieldID);
             jobject stringArrayObject = env->GetObjectField(jniObject, valueStringArray_jfieldID);
-            if (intArrayObject != nullptr && stringArrayObject != nullptr) {
+            if (intArrayObject != nullptr
+                && stringArrayObject != nullptr
+                && audioRecordMediaCodec
+                && audioRecord) {
                 // int[]
                 jint *intArray = reinterpret_cast<jint *>(
                         env->GetIntArrayElements(static_cast<jintArray>(intArrayObject), nullptr));
@@ -429,16 +470,21 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
                 env->ReleaseStringUTFChars(codec_name_, codec_name);
                 env->DeleteLocalRef(intArrayObject);
                 env->DeleteLocalRef(stringArrayObject);
+
+                audioRecord->setBufferSize(maxInputSize);
                 return env->NewStringUTF("true");
             }
             return env->NewStringUTF("false");
         }
         case DO_SOMETHING_CODE_start_audio_record: {
-//            audioRecord->createEngine();
-//            audioRecord->createAudioRecorder();
-//            audioRecord->startRecording();
+            if (audioRecord) {
+                audioRecord->createEngine();
+                audioRecord->createAudioRecorder();
+                audioRecord->startRecording();
+            }
 
-            jobject byteArrayObject = env->GetObjectField(jniObject, valueByteArray_jfieldID);
+            // Test
+            /*jobject byteArrayObject = env->GetObjectField(jniObject, valueByteArray_jfieldID);
             jbyte *byteArray = reinterpret_cast<jbyte *>(
                     env->GetByteArrayElements(
                             static_cast<jbyteArray>(byteArrayObject), nullptr));
@@ -452,7 +498,8 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
                     time,
                     0,
                     true, false, true);
-            env->DeleteLocalRef(byteArrayObject);
+            env->DeleteLocalRef(byteArrayObject);*/
+
             return env->NewStringUTF(ret);
         }
         case DO_SOMETHING_CODE_stop_audio_record: {

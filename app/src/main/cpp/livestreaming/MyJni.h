@@ -33,7 +33,7 @@ enum DO_SOMETHING_CODE {
     DO_SOMETHING_CODE_only_output_key_frame = 1019,
 
     // jni ---> java
-    DO_SOMETHING_CODE_connected = 2000,
+    DO_SOMETHING_CODE_internalOnResume = 2000,
     DO_SOMETHING_CODE_disconnected = 2001,
     DO_SOMETHING_CODE_change_window = 2002,
     DO_SOMETHING_CODE_find_decoder_codec_name = 2003,

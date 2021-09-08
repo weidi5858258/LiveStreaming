@@ -20,6 +20,8 @@ private:
     pthread_mutex_t aac_mutex;
     pthread_cond_t aac_cond;
 
+    pthread_mutex_t send_mutex;
+
     std::list<RTMPPacket *> h264_list;
     std::list<RTMPPacket *> aac_list;
     bool _isDoing;

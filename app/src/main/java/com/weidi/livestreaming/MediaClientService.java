@@ -26,6 +26,7 @@ import android.view.Surface;
 import android.view.View;
 import android.view.WindowManager;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -202,6 +203,7 @@ public class MediaClientService extends Service {
     private boolean mIsKeyFrameWritePortrait = false;
     private boolean mIsKeyFrameWriteLandscape = false;
 
+    private MediaCodec mediaCodec;
     private AudioRecord audioRecord;
     private byte[] audioData;
     private int sizeInBytes;
@@ -451,7 +453,7 @@ public class MediaClientService extends Service {
                 MediaUtils.sampleRateInHz,
                 MediaUtils.channelCount,
                 MediaUtils.channelConfig,
-                MediaUtils.getMinBufferSize()};
+                MediaUtils.getMinBufferSize() * 2};
         mAudioMime = MediaFormat.MIMETYPE_AUDIO_AAC;
         mAudioEncoderCodecName = MyJni.getEncoderCodecName(mAudioMime);
         Log.i(TAG,
@@ -460,39 +462,55 @@ public class MediaClientService extends Service {
         mMyJni.onTransact(
                 MyJni.DO_SOMETHING_CODE_start_audio_record_prepare, jniObject);
 
-        // Test
-        audioRecord = MediaUtils.createAudioRecord();
-        audioRecord.startRecording();
-        sizeInBytes = MediaUtils.getMinBufferSize();
-        audioData = new byte[sizeInBytes];
-
         mMediaProjection.registerCallback(mMediaProjectionCallback,
                 EventBusUtils.getThreadHandler());
 
         mMyJni.onTransact(DO_SOMETHING_CODE_start_screen_record, null);
-        //mMyJni.onTransact(DO_SOMETHING_CODE_start_audio_record, null);
+        mMyJni.onTransact(DO_SOMETHING_CODE_start_audio_record, null);
+        EventBusUtils.postUi(MainActivity.class.getName(), MAINACTIVITY_ON_RESUME, null);
 
+        // Test
+        /*mediaCodec = MediaUtils.getAudioEncoderMediaCodec();
+        audioRecord = MediaUtils.createAudioRecord();
+        audioRecord.startRecording();
+        sizeInBytes = MediaUtils.getMinBufferSize() * 2;
+        audioData = new byte[sizeInBytes];
         new Thread(new Runnable() {
             @Override
             public void run() {
                 for (; ; ) {
                     int size = audioRecord.read(audioData, 0, sizeInBytes);
-                    Log.i(TAG, "startScreenRecordForNative() size: " + size);
+                    //Log.i(TAG, "startScreenRecordForNative() size: " + size);
                     audioJniObject.valueByteArray = audioData;
                     audioJniObject.valueInt = size;
                     audioJniObject.valueLong = System.currentTimeMillis() * 1000;
                     mMyJni.onTransact(DO_SOMETHING_CODE_start_audio_record, audioJniObject);
+
+                    EDMediaCodec.feedInputBufferAndDrainOutputBuffer(
+                            mCallback,
+                            EDMediaCodec.TYPE.TYPE_AUDIO,
+                            mediaCodec,
+                            audioData,
+                            0,
+                            size,
+                            System.currentTimeMillis() * 1000,
+                            0,
+                            true,
+                            true);
                 }
             }
-        }).start();
+        }).start();*/
 
         Log.i(TAG, "startScreenRecordForNative() end");
         return true;
     }
 
     private synchronized void stopScreenRecordForNative() {
+        Log.i(TAG, "stopScreenRecordForNative() start");
         mMyJni.onTransact(DO_SOMETHING_CODE_stop_screen_record, null);
-        releaseAll();
+        //releaseAll();
+        EventBusUtils.postUi(MainActivity.class.getName(), MAINACTIVITY_ON_RESUME, null);
+        Log.i(TAG, "stopScreenRecordForNative() end");
     }
 
     /***
@@ -633,5 +651,37 @@ public class MediaClientService extends Service {
             }
         }
     }
+
+    private EDMediaCodec.Callback mCallback = new EDMediaCodec.Callback() {
+        @Override
+        public boolean isVideoFinished() {
+            return false;
+        }
+
+        @Override
+        public boolean isAudioFinished() {
+            return false;
+        }
+
+        @Override
+        public void handleVideoOutputFormat(MediaFormat mediaFormat) {
+
+        }
+
+        @Override
+        public void handleAudioOutputFormat(MediaFormat mediaFormat) {
+
+        }
+
+        @Override
+        public int handleVideoOutputBuffer(ByteBuffer room, MediaCodec.BufferInfo roomInfo) {
+            return 0;
+        }
+
+        @Override
+        public int handleAudioOutputBuffer(ByteBuffer room, MediaCodec.BufferInfo roomInfo) {
+            return 0;
+        }
+    };
 
 }

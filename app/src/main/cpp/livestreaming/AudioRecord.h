@@ -5,25 +5,24 @@
 #ifndef LIVESTREAMING_AUDIORECORD_H
 #define LIVESTREAMING_AUDIORECORD_H
 
+extern "C" {
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
+};
 
 class AudioRecord {
 private:
     // engine interfaces
-    SLObjectItf engineObject;
+    SLObjectItf engineObject = NULL;
     SLEngineItf engineEngine;
 
-    SLObjectItf recorderObject;
+    SLObjectItf recorderObject = NULL;
     SLRecordItf recorderRecord;
     SLAndroidSimpleBufferQueueItf recorderBufferQueue;
 
     int index;
-    short *recordBuffers[2];
+    unsigned char *recordBuffers[2];
     unsigned int recordBufferSize;
-
-    unsigned char *buffer;
-    size_t bufferSize;
 
     bool _isDoing;
 
@@ -50,6 +49,8 @@ public:
     void setMediaCodec(MediaCodec *codec) {
         mediaCodec = codec;
     }
+
+    void setBufferSize(int size);
 
 private:
     // 回调函数要设置成static

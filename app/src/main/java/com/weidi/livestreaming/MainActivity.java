@@ -18,10 +18,13 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import static com.weidi.livestreaming.Constants.CREATE_SCREEN_CAPTURE_INTENT;
+import static com.weidi.livestreaming.Constants.MAINACTIVITY_ON_RESUME;
 import static com.weidi.livestreaming.Constants.RELEASE;
 import static com.weidi.livestreaming.Constants.SET_ACTIVITY;
 import static com.weidi.livestreaming.Constants.SET_MEDIAPROJECTION;
 import static com.weidi.livestreaming.Constants.START_SCREEN_RECORD;
+import static com.weidi.livestreaming.Constants.STOP_SCREEN_RECORD;
+import static com.weidi.livestreaming.MyJni.DO_SOMETHING_CODE_is_recording;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -32,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.i(TAG, "onCreate()");
         /*getWindow().setFlags(
                 WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);*/
@@ -107,6 +111,22 @@ public class MainActivity extends AppCompatActivity {
         internalonActivityResult(requestCode, resultCode, data);
     }
 
+    @Override
+    public void onBackPressed() {
+        Log.i(TAG, "onBackPressed()");
+        String ret = MyJni.getDefault().onTransact(DO_SOMETHING_CODE_is_recording, null);
+        if (!TextUtils.isEmpty(ret)) {
+            mIsLiving2 = Boolean.parseBoolean(ret);
+            if (mIsLiving2) {
+                moveTaskToBack(true);
+                return;
+            }
+        }
+
+        super.onBackPressed();
+        finish();
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////
 
     private MediaProjectionManager mMediaProjectionManager;
@@ -140,7 +160,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void internalOnResume() {
-        String ret = MyJni.getDefault().onTransact(MyJni.DO_SOMETHING_CODE_is_recording, null);
+        mIsLiving1 = false;
+        String ret = MyJni.getDefault().onTransact(DO_SOMETHING_CODE_is_recording, null);
         if (!TextUtils.isEmpty(ret)) {
             mIsLiving2 = Boolean.parseBoolean(ret);
         }
@@ -223,40 +244,30 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void requestPermission() {
-        Log.i(TAG, "requestPermission()");
-        /*Object object = EventBusUtils.post(
-                MediaClientService.class, IS_RECORDING, null);
-        if (object != null) {
-            boolean isRecording = (boolean) object;
-            if (isRecording) {
-                Log.e(TAG, "requestPermission() return for is recording");
-                Toast.makeText(getApplicationContext(), "正在录屏", Toast.LENGTH_SHORT).show();
-                return;
-            }
-        }*/
-
-        if (mMediaProjectionManager != null) {
-            startActivityForResult(
-                    mMediaProjectionManager.createScreenCaptureIntent(),
-                    CREATE_SCREEN_CAPTURE_INTENT);
-        }
-    }
-
     private void onClick(View v) {
         switch (v.getId()) {
             case R.id.btn1: {
                 break;
             }
             case R.id.btn2: {
-                EventBusUtils.removeMessages(CREATE_SCREEN_CAPTURE_INTENT);
-                EventBusUtils.postDelayed(MainActivity.class.getName(),
-                        CREATE_SCREEN_CAPTURE_INTENT, 500, null);
+                if (mIsLiving2) {
+                    EventBusUtils.removeMessages(STOP_SCREEN_RECORD);
+                    EventBusUtils.postDelayed(MainActivity.class.getName(),
+                            STOP_SCREEN_RECORD, 500, null);
+                } else {
+                    EventBusUtils.removeMessages(CREATE_SCREEN_CAPTURE_INTENT);
+                    EventBusUtils.postDelayed(MainActivity.class.getName(),
+                            CREATE_SCREEN_CAPTURE_INTENT, 500, null);
+                }
                 break;
             }
             default:
                 break;
         }
+
+        /*EventBusUtils.removeMessages(MAINACTIVITY_ON_RESUME);
+        EventBusUtils.postDelayed(MainActivity.class.getName(),
+                MAINACTIVITY_ON_RESUME, 1000, null);*/
     }
 
     private Object onEvent(int what, Object[] objArray) {
@@ -265,8 +276,21 @@ public class MainActivity extends AppCompatActivity {
             case 0: {
                 break;
             }
+            case STOP_SCREEN_RECORD: {
+                EventBusUtils.postThread(
+                        MediaClientService.class.getName(), STOP_SCREEN_RECORD, null);
+                break;
+            }
+            case MAINACTIVITY_ON_RESUME: {
+                internalOnResume();
+                break;
+            }
             case CREATE_SCREEN_CAPTURE_INTENT: {
-                requestPermission();
+                if (mMediaProjectionManager != null) {
+                    startActivityForResult(
+                            mMediaProjectionManager.createScreenCaptureIntent(),
+                            CREATE_SCREEN_CAPTURE_INTENT);
+                }
                 break;
             }
             default:

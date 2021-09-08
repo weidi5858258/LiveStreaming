@@ -128,6 +128,7 @@ void MediaCodec::startScreenRecordEncoderMediaCodec(
         return;
     }
 
+    _isDoing = true;
     _isVideo = true;
     AMediaFormat *pFormat = AMediaFormat_new();
     AMediaFormat_setString(pFormat, AMEDIAFORMAT_KEY_MIME, mime);
@@ -158,12 +159,15 @@ void MediaCodec::startAudioRecordEncoderMediaCodec(
         return;
     }
 
+    // audio/mp4a-latm OMX.google.aac.encoder
     LOGI("MediaCodec::startAudioRecordEncoderMediaCodec()"
          " mime: %s codec_name: %s\n", mime, codec_name);
+    // 44100 2 12 28288
     LOGI("MediaCodec::startAudioRecordEncoderMediaCodec()"
          " sampleRate: %d channelCount: %d channelConfig: %d maxInputSize: %d\n",
          sampleRate, channelCount, channelConfig, maxInputSize);
 
+    _isDoing = true;
     _isVideo = false;
     AMediaFormat *pFormat = AMediaFormat_new();
     AMediaFormat_setString(pFormat, AMEDIAFORMAT_KEY_MIME, mime);
@@ -184,13 +188,12 @@ void MediaCodec::startAudioRecordEncoderMediaCodec(
 }
 
 void MediaCodec::startScreenRecord() {
-    if (_isDoing) {
+    /*if (_isDoing) {
         LOGE("MediaCodec::startScreenRecord() return for _isDoing is true\n");
         return;
-    }
+    }*/
 
     LOGI("MediaCodec::startScreenRecord() start\n");
-    _isDoing = true;
     createPortraitVirtualDisplay();
     /*if (_sps_pps == nullptr) {
         getSpsPps();
@@ -221,10 +224,15 @@ void *MediaCodec::startScreenRecordEncoder(void *arg) {
             // 申请关键帧
             start_time = end_time;
         }*/
-        mediaCodec->drainOutputBuffer(mediaCodec->_codec, true, false);
+        if (!mediaCodec->drainOutputBuffer(mediaCodec->_codec, true, false)) {
+            mediaCodec->_isDoing = false;
+            break;
+        }
     }
     LOGI("MediaCodec::startScreenRecordEncoder() end\n");
     onTransact_release(nullptr, nullptr, 0, nullptr);
+
+    return nullptr;
 }
 
 bool MediaCodec::feedInputBufferAndDrainOutputBuffer(AMediaCodec *codec,
@@ -245,8 +253,12 @@ bool MediaCodec::feedInputBufferAndDrainOutputBuffer(AMediaCodec *codec,
 bool MediaCodec::feedInputBuffer(AMediaCodec *codec,
                                  unsigned char *data, off_t offset, size_t size,
                                  uint64_t time, uint32_t flags) {
+    if (!_isDoing) {
+        return false;
+    }
+
     ssize_t roomIndex = AMediaCodec_dequeueInputBuffer(codec, TIME_OUT);
-    LOGI("MediaCodec::feedInputBuffer() roomIndex: %d", roomIndex);
+    //LOGI("MediaCodec::feedInputBuffer()   roomIndex: %d", roomIndex);
     if (roomIndex < 0) {
         return true;
     }
@@ -268,11 +280,11 @@ bool MediaCodec::drainOutputBuffer(AMediaCodec *codec, bool release, bool render
     size_t out_size = 0;
     for (;;) {
         if (!_isDoing) {
-            break;
+            return false;
         }
 
         ssize_t roomIndex = AMediaCodec_dequeueOutputBuffer(codec, &info, TIME_OUT);
-        LOGI("MediaCodec::drainOutputBuffer() roomIndex: %d", roomIndex);
+        //LOGI("MediaCodec::drainOutputBuffer() roomIndex: %d", roomIndex);
         if (roomIndex < 0) {
             switch (roomIndex) {
                 case AMEDIACODEC_INFO_TRY_AGAIN_LATER: {
@@ -477,27 +489,29 @@ void MediaCodec::screenRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data
             break;
         }
         case 1:
-        default:
+        default: {
             handleVideo(info, data);
             break;
+        }
     }
 
 }
 
 void MediaCodec::audioRecordCallback(AMediaCodecBufferInfo &info, uint8_t *data) {
-    LOGI("MediaCodec::audioRecordCallback()\n");
     // data就是音频采集后编码成aac的数据
     // 然后进行封装
     // 最后进行发送
+    //LOGI("MediaCodec::audioRecordCallback() info.size: %d", info.size);
     switch (info.flags) {
         case 2: {
             handleAudioSpsPps(info, data);
             break;
         }
         case 1:
-        default:
+        default: {
             handleAudio(info, data);
             break;
+        }
     }
 }
 
@@ -696,7 +710,9 @@ MediaCodec::MARK MediaCodec::handleAudioSpsPps(AMediaCodecBufferInfo &info, uint
     // https://blog.csdn.net/jenie/article/details/106953850
     int32_t size = info.size;
     MARK mark = MARK0;
-
+    // 0x12 0x10 0x0 0x0 0x0 0x0
+    /*LOGI("MediaCodec::handleAudioSpsPps() 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x",
+         sps_pps[0], sps_pps[1], sps_pps[2], sps_pps[3], sps_pps[4], sps_pps[5]);*/
     RTMPPacket *packet = nullptr;
     packet = (RTMPPacket *) malloc(sizeof(RTMPPacket));
     RTMPPacket_Alloc(packet, 4);
@@ -707,7 +723,7 @@ MediaCodec::MARK MediaCodec::handleAudioSpsPps(AMediaCodecBufferInfo &info, uint
     packet->m_body[2] = 0x11;
     packet->m_body[3] = 0x90;//0x10修改为0x90,2016-1-19
 
-    packet->m_headerType = RTMP_PACKET_SIZE_MEDIUM;
+    packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
     packet->m_packetType = RTMP_PACKET_TYPE_AUDIO;
     packet->m_nChannel = STREAM_CHANNEL_AUDIO;
     packet->m_nBodySize = 4;
@@ -716,6 +732,8 @@ MediaCodec::MARK MediaCodec::handleAudioSpsPps(AMediaCodecBufferInfo &info, uint
     packet->m_nInfoField2 = _rtmp->m_stream_id;
 
     _send->putAac(packet);
+
+    return mark;
 }
 
 void MediaCodec::handleVideo(AMediaCodecBufferInfo &info, uint8_t *data) {
@@ -743,12 +761,12 @@ void MediaCodec::handleVideo(AMediaCodecBufferInfo &info, uint8_t *data) {
     packet->m_body[7] = (size >> 8) & 0xFF;
     packet->m_body[8] = size & 0xFF;
     memcpy(&packet->m_body[9], data, size);
+    packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
     packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
-    packet->m_nBodySize = body_size;
     packet->m_nChannel = STREAM_CHANNEL_VIDEO;
+    packet->m_nBodySize = body_size;
     packet->m_nTimeStamp = info.presentationTimeUs / 1000;//
     packet->m_hasAbsTimestamp = 0;
-    packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
     packet->m_nInfoField2 = _rtmp->m_stream_id;
 
     _send->putH264(packet);
@@ -767,7 +785,7 @@ void MediaCodec::handleAudio(AMediaCodecBufferInfo &info, uint8_t *data) {
     packet->m_body[1] = 0x01;
     memcpy(&packet->m_body[2], data, size);
 
-    packet->m_headerType = RTMP_PACKET_SIZE_MEDIUM;
+    packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
     packet->m_packetType = RTMP_PACKET_TYPE_AUDIO;
     packet->m_nChannel = STREAM_CHANNEL_AUDIO;
     packet->m_nBodySize = body_size;

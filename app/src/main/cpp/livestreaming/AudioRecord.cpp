@@ -14,60 +14,67 @@
 
 #define LOG "player_alexander"
 
-#define RECORDER_FRAMES 2048
+#define RECORDER_FRAMES 4096
 
 static pthread_mutex_t audioEngineLock = PTHREAD_MUTEX_INITIALIZER;
 
 AudioRecord::AudioRecord() :
         engineObject(NULL),
-        engineEngine(NULL),
+        //engineEngine(NULL),
         recorderObject(NULL),
-        recorderRecord(NULL),
-        recorderBufferQueue(NULL),
+        //recorderRecord(NULL),
+        //recorderBufferQueue(NULL),
         index(0),
         recordBufferSize(RECORDER_FRAMES),
         _isDoing(false),
         mediaCodec(NULL) {
     LOGI("AudioRecord::AudioRecord()");
-    recordBuffers[0] = new short[recordBufferSize];
-    recordBuffers[1] = new short[recordBufferSize];
-    buffer = (unsigned char *) malloc(4096);
-    bufferSize = 4096;
+    //recordBuffers[0] = (unsigned char *) malloc(recordBufferSize * sizeof(unsigned char));
+    //recordBuffers[1] = (unsigned char *) malloc(recordBufferSize * sizeof(unsigned char));
 }
 
 AudioRecord::~AudioRecord() {
     LOGI("AudioRecord::~AudioRecord()");
     if (recordBuffers[0]) {
-        delete recordBuffers[0];
+        //delete recordBuffers[0];
+        free(recordBuffers[0]);
         recordBuffers[0] = NULL;
     }
-
+    LOGI("AudioRecord::~AudioRecord() 1");
     if (recordBuffers[1]) {
-        delete recordBuffers[1];
+        //delete recordBuffers[1];
+        free(recordBuffers[0]);
         recordBuffers[1] = NULL;
     }
-
-    if (buffer) {
-        free(buffer);
-        buffer = nullptr;
-    }
-
+    LOGI("AudioRecord::~AudioRecord() 2");
     // destroy audio recorder object, and invalidate all associated interfaces
     if (recorderObject != NULL) {
+        LOGI("AudioRecord::~AudioRecord() 10");
         (*recorderObject)->Destroy(recorderObject);
+        LOGI("AudioRecord::~AudioRecord() 11");
         recorderObject = NULL;
+        LOGI("AudioRecord::~AudioRecord() 12");
         recorderRecord = NULL;
+        LOGI("AudioRecord::~AudioRecord() 13");
         recorderBufferQueue = NULL;
+        LOGI("AudioRecord::~AudioRecord() 14");
     }
-
+    LOGI("AudioRecord::~AudioRecord() 3");
     // destroy engine object, and invalidate all associated interfaces
     if (engineObject != NULL) {
         (*engineObject)->Destroy(engineObject);
         engineObject = NULL;
         engineEngine = NULL;
     }
-
+    LOGI("AudioRecord::~AudioRecord() 4");
     //pthread_mutex_destroy(&audioEngineLock);
+}
+
+void AudioRecord::setBufferSize(int size) {
+    LOGI("AudioRecord::setBufferSize() size: %d", size);
+    recordBufferSize = size;
+    recordBuffers[0] = (unsigned char *) malloc(recordBufferSize * sizeof(unsigned char));
+    recordBuffers[1] = (unsigned char *) malloc(recordBufferSize * sizeof(unsigned char));
 }
 
 void AudioRecord::createEngine() {
@@ -175,7 +182,8 @@ void AudioRecord::startRecording() {
 
     // enqueue an empty buffer to be filled by the recorder
     // (for streaming recording, we would enqueue at least 2 empty buffers to start things off)
-    result = (*recorderBufferQueue)->Enqueue(recorderBufferQueue, buffer, bufferSize);
+    result = (*recorderBufferQueue)->Enqueue(
+            recorderBufferQueue, recordBuffers[index], recordBufferSize);
     // the most likely other result is SL_RESULT_BUFFER_INSUFFICIENT,
     // which for this code example would indicate a programming error
     assert(SL_RESULT_SUCCESS == result);
@@ -188,8 +196,6 @@ void AudioRecord::startRecording() {
     LOGI("AudioRecord::startRecording() end\n");
 }
 
-static uint64_t count = 0;
-
 // this callback handler is called every time a buffer finishes recording
 void AudioRecord::bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *context) {
     if (context == NULL) {
@@ -198,39 +204,47 @@ void AudioRecord::bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *con
 
     AudioRecord *audioRecord = (AudioRecord *) context;
 
+    bool needStop = false;
     // for streaming recording, here we would call Enqueue to give recorder the next buffer to fill
     // but instead, this is a one-time buffer so we stop recording
     SLresult result;
     if (audioRecord->_isDoing) {
-        /*int tempIndex = audioRecord->index;
-        unsigned int tempRecordBufferSize = audioRecord->recordBufferSize;*/
-
-        // 处理PCM数据(进行编码)
-        if (audioRecord->buffer != nullptr && audioRecord->bufferSize > 0) {
-            if (audioRecord->mediaCodec != NULL) {
-                /*LOGI("AudioRecord::bqRecorderCallback() tempRecordBufferSize: %lld\n",
-                     audioRecord->recordBufferSize);*/
-                audioRecord->mediaCodec->feedInputBufferAndDrainOutputBuffer(
-                        audioRecord->mediaCodec->getMediaCodec(),
-                        audioRecord->buffer,
-                        0,
-                        audioRecord->bufferSize,
-                        (++count),//
-                        0,
-                        true, false, true);
-            }
-        }
+        int tempIndex = audioRecord->index;
+        unsigned int tempRecordBufferSize = audioRecord->recordBufferSize;
 
         audioRecord->index = 1 - audioRecord->index;
         (*audioRecord->recorderBufferQueue)->Enqueue(audioRecord->recorderBufferQueue,
-                                                     audioRecord->buffer,
-                                                     audioRecord->bufferSize);
+                                                     audioRecord->recordBuffers[audioRecord->index],
+                                                     audioRecord->recordBufferSize);
+
+        // 处理PCM数据(进行编码)
+        if (audioRecord->mediaCodec != NULL) {
+            /*LOGI("AudioRecord::bqRecorderCallback() tempRecordBufferSize: %lld\n",
+                 audioRecord->recordBufferSize);*/
+            bool feedAndDrain = audioRecord->mediaCodec->feedInputBufferAndDrainOutputBuffer(
+                    audioRecord->mediaCodec->getMediaCodec(),
+                    audioRecord->recordBuffers[tempIndex],
+                    0,
+                    tempRecordBufferSize,
+                    0,//
+                    0,
+                    true, false, true);
+            if (!feedAndDrain) {
+                needStop = true;
+            }
+        }
     } else {
+        needStop = true;
+    }
+
+    if (needStop) {
+        audioRecord->_isDoing = false;
         result = (*audioRecord->recorderRecord)->SetRecordState(
                 audioRecord->recorderRecord, SL_RECORDSTATE_STOPPED);
         if (SL_RESULT_SUCCESS == result) {
             //recorderSize = RECORDER_FRAMES * sizeof(short);
         }
+        LOGI("AudioRecord::bqRecorderCallback() SL_RECORDSTATE_STOPPED\n");
         onTransact_release(nullptr, nullptr, 0, nullptr);
     }
 

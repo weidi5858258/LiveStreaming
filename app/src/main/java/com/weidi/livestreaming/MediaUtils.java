@@ -991,7 +991,7 @@ public class MediaUtils {
      */
     // 下面的参数为了得到默认的AudioRecord对象和AudioTrack对象而定义的
     // 兼容所有Android设备
-    public static int sampleRateInHz = 44100;
+    public static int sampleRateInHz = 48000;// 44100
     // 下面两个是对应关系,只是方法所需要的参数不一样而已
     public static int channelCount = 2;
     // 立体声(AudioFormat.CHANNEL_IN_STEREO = AudioFormat.CHANNEL_OUT_STEREO)

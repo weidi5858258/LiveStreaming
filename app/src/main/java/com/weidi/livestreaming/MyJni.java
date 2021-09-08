@@ -9,6 +9,8 @@ import android.util.Log;
 import java.util.Iterator;
 import java.util.concurrent.ArrayBlockingQueue;
 
+import static com.weidi.livestreaming.Constants.MAINACTIVITY_ON_RESUME;
+
 /***
  http://anddymao.com/2019/10/16/2019-10-16-ndk-MediaCodec/
  NDK中使用MediaCodec编解码视频
@@ -54,7 +56,7 @@ public class MyJni {
     public static final int DO_SOMETHING_CODE_is_recording = 1018;
 
     // jni ---> java
-    public static final int DO_SOMETHING_CODE_connected = 2000;
+    public static final int DO_SOMETHING_CODE_internalOnResume = 2000;
     public static final int DO_SOMETHING_CODE_disconnected = 2001;
     public static final int DO_SOMETHING_CODE_change_window = 2002;
     public static final int DO_SOMETHING_CODE_find_decoder_codec_name = 2003;
@@ -78,7 +80,8 @@ public class MyJni {
 
     private void jni2Java(int code, JniObject jniObject) {
         switch (code) {
-            case DO_SOMETHING_CODE_connected: {
+            case DO_SOMETHING_CODE_internalOnResume: {
+                EventBusUtils.postUi(MainActivity.class.getName(), MAINACTIVITY_ON_RESUME, null);
                 break;
             }
             case DO_SOMETHING_CODE_find_createPortraitVirtualDisplay: {

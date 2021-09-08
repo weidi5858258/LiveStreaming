@@ -13,9 +13,9 @@ public interface Constants {
     int STOP_SERVER = 9;
     int START_MAINACTIVITY = 10;
     int MAINACTIVITY_ON_RESUME = 11;
-    int ACCELEROMETER_ROTATION = 100;
     int CREATE_SCREEN_CAPTURE_INTENT = 12;
 
+    int ACCELEROMETER_ROTATION = 100;
 
     int REQUEST_PERMISSION = 3;
     int GO_BACKGROUND = 7;
