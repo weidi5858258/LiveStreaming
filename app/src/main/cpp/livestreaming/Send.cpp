@@ -117,7 +117,7 @@ void *Send::sendH264(void *arg) {
         // send
         if (send->_rtmp) {
             pthread_mutex_lock(&send->send_mutex);
-            RTMP_SendPacket(send->_rtmp, packet, 1);
+            RTMP_SendPacket(send->_rtmp, packet, TRUE);
             pthread_mutex_unlock(&send->send_mutex);
         }
         RTMPPacket_Free(packet);
@@ -155,7 +155,7 @@ void *Send::sendAac(void *arg) {
         // send
         if (send->_rtmp) {
             pthread_mutex_lock(&send->send_mutex);
-            RTMP_SendPacket(send->_rtmp, packet, 1);
+            RTMP_SendPacket(send->_rtmp, packet, TRUE);
             pthread_mutex_unlock(&send->send_mutex);
         }
         RTMPPacket_Free(packet);

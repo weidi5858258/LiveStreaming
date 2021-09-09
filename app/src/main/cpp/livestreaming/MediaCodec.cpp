@@ -624,16 +624,6 @@ MediaCodec::MARK MediaCodec::handleVideoSpsPps(AMediaCodecBufferInfo &info, uint
 
         // region
         if (spsIndex != -1 && ppsIndex != -1) {
-            if (mark == MARK3) {
-
-            } else if (mark == MARK4) {
-
-            }
-            if (mark == MARK3) {
-
-            } else if (mark == MARK4) {
-
-            }
             _sps_length = spsLength;
             _pps_length = ppsLength;
             _sps = (uint8_t *) malloc(_sps_length);
