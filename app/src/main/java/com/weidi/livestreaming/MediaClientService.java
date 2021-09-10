@@ -28,6 +28,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.OrientationEventListener;
+import android.view.OrientationListener;
 import android.view.Surface;
 import android.view.View;
 import android.view.WindowManager;
@@ -36,6 +37,9 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
 import static com.weidi.livestreaming.Constants.ACCELEROMETER_ROTATION;
 import static com.weidi.livestreaming.Constants.IS_RECORDING;
@@ -140,14 +144,17 @@ public class MediaClientService extends Service {
 
     private void internalOnStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) {
+            Log.i(TAG, "internalOnStartCommand() return for intent is null");
             return;
         }
         String action = intent.getStringExtra("action");
+        Log.i(TAG, "internalOnStartCommand() action: " + action);
         if (TextUtils.equals(action, "GetMediaProjection")) {
             createNotificationChannel();
             int resultCode = intent.getIntExtra("code", -1);
             Intent data = intent.getParcelableExtra("data");
             mMediaProjection = mMediaProjectionManager.getMediaProjection(resultCode, data);
+            Log.i(TAG, "internalOnStartCommand() mMediaProjection: " + mMediaProjection);
             EventBusUtils.postThread(
                     MediaClientService.class.getName(), START_SCREEN_RECORD, null);
         }
@@ -623,35 +630,53 @@ public class MediaClientService extends Service {
     }
 
     private void createNotificationChannel() {
-        //获取一个Notification构造器
-        Notification.Builder builder = new Notification.Builder(this.getApplicationContext());
+        //https://blog.csdn.net/shanshui911587154/article/details/105683683
+
+        String id = "screen_record_id";
+        String name = "screen_record_name";
+        int importance = NotificationManager.IMPORTANCE_DEFAULT;
+
         //点击后跳转的界面，可以设置跳转数据
         Intent intent = new Intent(this, MainActivity.class);
+        //intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, 0);
 
-        // 设置PendingIntent
-        builder.setContentIntent(PendingIntent.getActivity(this, 0, intent, 0))
-                // 设置下拉列表中的图标(大图标)
-                .setLargeIcon(BitmapFactory.decodeResource(this.getResources(), R.mipmap.ic_launcher))
-                .setContentTitle("A")// 设置下拉列表里的标题
-                .setSmallIcon(R.mipmap.ic_launcher)// 设置状态栏内的小图标
-                .setContentText("B")// 设置上下文内容
-                .setWhen(System.currentTimeMillis());// 设置该通知发生的时间
+        createNotificationChannel(id, name, importance);
 
-        /*以下是对Android 8.0的适配*/
-        // 普通notification适配
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            builder.setChannelId("notification_id");
-            // 前台服务notification适配
-            NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            NotificationChannel channel = new NotificationChannel("notification_id", "notification_name", NotificationManager.IMPORTANCE_LOW);
-            notificationManager.createNotificationChannel(channel);
-        }
-
-        // 获取构建好的Notification
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, id)
+                .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setLargeIcon(
+                        BitmapFactory.decodeResource(this.getResources(), R.drawable.anc))
+                .setSmallIcon(R.drawable.akj)          // 设置状态栏内的小图标
+                .setContentTitle("Screen Record Title")// 设置下拉列表里的标题
+                .setContentText("Screen Record Text")  // 设置上下文内容
+                .setWhen(System.currentTimeMillis())   // 设置该通知发生的时间
+                .setChannelId(id)
+                .setAutoCancel(true);
         Notification notification = builder.build();
-        // 设置为默认的声音
         notification.defaults = Notification.DEFAULT_SOUND;
-        startForeground(110, notification);
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+        notificationManager.notify(100, notification);
+
+        /*
+        android.app.RemoteServiceException:
+        Context.startForegroundService() did not then call Service.startForeground()
+        因为在MainActivity中是用startForegroundService(...)方法启动的,因此需要调用
+        startForeground(...)方法,不然会有异常.
+         */
+        startForeground(100, notification);
+    }
+
+    private String createNotificationChannel(String channelID, String channelNAME, int level) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            NotificationManager manager =
+                    (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            NotificationChannel channel = new NotificationChannel(channelID, channelNAME, level);
+            manager.createNotificationChannel(channel);
+            return channelID;
+        }
+        return null;
     }
 
     private class OrientationListener extends OrientationEventListener {

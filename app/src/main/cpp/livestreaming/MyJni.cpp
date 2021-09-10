@@ -471,7 +471,7 @@ Java_com_weidi_livestreaming_MyJni_onTransact(JNIEnv *env, jobject thiz,
                 env->DeleteLocalRef(intArrayObject);
                 env->DeleteLocalRef(stringArrayObject);
 
-                audioRecord->setBufferSize(maxInputSize);
+                audioRecord->setBufferSize(8192);
                 return env->NewStringUTF("true");
             }
             return env->NewStringUTF("false");

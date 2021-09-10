@@ -13,12 +13,12 @@ extern "C" {
 class AudioRecord {
 private:
     // engine interfaces
-    SLObjectItf engineObject = NULL;
+    /*SLObjectItf engineObject = NULL;
     SLEngineItf engineEngine;
 
     SLObjectItf recorderObject = NULL;
     SLRecordItf recorderRecord;
-    SLAndroidSimpleBufferQueueItf recorderBufferQueue;
+    SLAndroidSimpleBufferQueueItf recorderBufferQueue;*/
 
     int index;
     unsigned char *recordBuffers[2];

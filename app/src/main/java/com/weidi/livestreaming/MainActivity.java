@@ -212,6 +212,7 @@ public class MainActivity extends AppCompatActivity {
             case CREATE_SCREEN_CAPTURE_INTENT: {
                 // requestCode: 1000 resultCode: -1 data: Intent { (has extras) }
                 // MediaProjection对象是这样来的,所以要得到MediaProjection对象,必须同意权限
+                Log.i(TAG, "internalonActivityResult() CREATE_SCREEN_CAPTURE_INTENT");
                 EventBusUtils.postThread(
                         MediaClientService.class.getName(), SET_ACTIVITY,
                         new Object[]{MainActivity.this});
@@ -220,6 +221,8 @@ public class MainActivity extends AppCompatActivity {
                 service.putExtra("action", "GetMediaProjection");
                 service.putExtra("code", resultCode);
                 service.putExtra("data", data);
+                //android.app.RemoteServiceException:
+                //Context.startForegroundService() did not then call Service.startForeground()
                 startForegroundService(service);
 
                 /*if (mMediaProjectionManager != null) {

@@ -18,12 +18,20 @@
 
 static pthread_mutex_t audioEngineLock = PTHREAD_MUTEX_INITIALIZER;
 
+// engine interfaces
+static SLObjectItf engineObject = NULL;
+static SLEngineItf engineEngine;
+
+static SLObjectItf recorderObject = NULL;
+static SLRecordItf recorderRecord;
+static SLAndroidSimpleBufferQueueItf recorderBufferQueue;
+
 AudioRecord::AudioRecord() :
-        engineObject(NULL),
-        //engineEngine(NULL),
-        recorderObject(NULL),
-        //recorderRecord(NULL),
-        //recorderBufferQueue(NULL),
+//engineObject(NULL),
+//engineEngine(NULL),
+//recorderObject(NULL),
+//recorderRecord(NULL),
+//recorderBufferQueue(NULL),
         index(0),
         recordBufferSize(RECORDER_FRAMES),
         _isDoing(false),
@@ -49,15 +57,10 @@ AudioRecord::~AudioRecord() {
     LOGI("AudioRecord::~AudioRecord() 2");
     // destroy audio recorder object, and invalidate all associated interfaces
     if (recorderObject != NULL) {
-        LOGI("AudioRecord::~AudioRecord() 10");
         (*recorderObject)->Destroy(recorderObject);
-        LOGI("AudioRecord::~AudioRecord() 11");
         recorderObject = NULL;
-        LOGI("AudioRecord::~AudioRecord() 12");
         recorderRecord = NULL;
-        LOGI("AudioRecord::~AudioRecord() 13");
         recorderBufferQueue = NULL;
-        LOGI("AudioRecord::~AudioRecord() 14");
     }
     LOGI("AudioRecord::~AudioRecord() 3");
     // destroy engine object, and invalidate all associated interfaces
@@ -171,6 +174,7 @@ void AudioRecord::startRecording() {
     if (pthread_mutex_trylock(&audioEngineLock)) {
         return;
     }
+
     // in case already recording, stop recording and clear buffer queue
     result = (*recorderRecord)->SetRecordState(recorderRecord, SL_RECORDSTATE_STOPPED);
     assert(SL_RESULT_SUCCESS == result);
@@ -205,7 +209,6 @@ void AudioRecord::bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *con
     }
 
     AudioRecord *audioRecord = (AudioRecord *) context;
-
     bool needStop = false;
     // for streaming recording, here we would call Enqueue to give recorder the next buffer to fill
     // but instead, this is a one-time buffer so we stop recording
@@ -215,9 +218,12 @@ void AudioRecord::bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *con
         unsigned int tempRecordBufferSize = audioRecord->recordBufferSize;
 
         audioRecord->index = 1 - audioRecord->index;
-        (*audioRecord->recorderBufferQueue)->Enqueue(audioRecord->recorderBufferQueue,
+        (*recorderBufferQueue)->Enqueue(recorderBufferQueue,
+                                        audioRecord->recordBuffers[audioRecord->index],
+                                        audioRecord->recordBufferSize);
+        /*(*audioRecord->recorderBufferQueue)->Enqueue(audioRecord->recorderBufferQueue,
                                                      audioRecord->recordBuffers[audioRecord->index],
-                                                     audioRecord->recordBufferSize);
+                                                     audioRecord->recordBufferSize);*/
 
         // 处理PCM数据(进行编码)
         if (audioRecord->mediaCodec != NULL) {
@@ -241,12 +247,15 @@ void AudioRecord::bqRecorderCallback(SLAndroidSimpleBufferQueueItf bq, void *con
 
     if (needStop) {
         audioRecord->_isDoing = false;
-        result = (*audioRecord->recorderRecord)->SetRecordState(
-                audioRecord->recorderRecord, SL_RECORDSTATE_STOPPED);
+        LOGI("AudioRecord::bqRecorderCallback() SL_RECORDSTATE_STOPPED\n");
+        result = (*recorderRecord)->SetRecordState(
+                recorderRecord, SL_RECORDSTATE_STOPPED);
+        /*result = (*audioRecord->recorderRecord)->SetRecordState(
+                audioRecord->recorderRecord, SL_RECORDSTATE_STOPPED);*/
         if (SL_RESULT_SUCCESS == result) {
             //recorderSize = RECORDER_FRAMES * sizeof(short);
+            LOGI("AudioRecord::bqRecorderCallback() SL_RESULT_SUCCESS\n");
         }
-        LOGI("AudioRecord::bqRecorderCallback() SL_RECORDSTATE_STOPPED\n");
         onTransact_release(nullptr, nullptr, 0, nullptr);
     }
 
